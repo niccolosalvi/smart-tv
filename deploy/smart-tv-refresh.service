@@ -1,0 +1,6 @@
+[Unit]
+Description=Daily Smart TV server memory refresh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl try-restart smart-tv.service

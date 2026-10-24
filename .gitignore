@@ -1,0 +1,34 @@
+# Local environments and generated Python files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Private backups, deployment artifacts, runtime data and diagnostics
+.local-backup/
+.local/
+reports/
+*.jsonl
+*.log
+*.tar.gz
+*.zip
+epg-cache.json
+ui-context.json
+wake-config.json
+tv-token
+*token*.json
+
+# Credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+server.env
+*.pem
+*.key
+id_ed25519*
+id_rsa*
+.DS_Store
+Thumbs.db

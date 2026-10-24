@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Smart TV at 11:00 Italian time
+
+[Timer]
+OnCalendar=*-*-* 11:00:00 Europe/Rome
+AccuracySec=1s
+Persistent=false
+Unit=smart-tv-refresh.service
+
+[Install]
+WantedBy=timers.target
