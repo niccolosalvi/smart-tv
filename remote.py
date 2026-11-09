@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 from samsungtvws import SamsungTVWS
 from diagnostics import timeline, tv_event
+from text_input import youtube_search_payload
 
 logging.getLogger('samsungtvws').setLevel(logging.CRITICAL)
 logging.getLogger('websocket').setLevel(logging.CRITICAL)
@@ -126,6 +127,29 @@ class Remote:
             except Exception as exc:
                 self.tv.close()
                 record(action or ','.join(keys), start, 'error', error_type=type(exc).__name__)
+                raise RuntimeError(type(exc).__name__) from None
+
+    def search_youtube(self, query):
+        body = youtube_search_payload(query)
+        with self.lock:
+            started = time.perf_counter()
+            try:
+                # Verified on the KS7000 with YouTube already foregrounded.
+                # WebSocket deep links only opened the app and lost the query.
+                # The DIAL Origin header is required on Samsung receivers.
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                request = urllib.request.Request(f'http://{HOST}:8080/ws/apps/YouTube',
+                    data=body, method='POST', headers={
+                        'Origin': 'https://www.youtube.com',
+                        'Content-Type': 'application/x-www-form-urlencoded'})
+                timeline.emit('Server → TV', 'DIAL ricerca YouTube · query esclusa dai log')
+                with opener.open(request, timeout=6) as response:
+                    http_status = response.status
+                return record('youtube:search', started, 'sent', transport='dial',
+                              http_status=http_status,
+                              note='Ricerca richiesta nell’app YouTube; risultati non letti dal server')
+            except Exception as exc:
+                record('youtube:search', started, 'error', error_type=type(exc).__name__)
                 raise RuntimeError(type(exc).__name__) from None
 
     def switch_to_tv(self):

@@ -38,6 +38,7 @@ class CommandTests(unittest.TestCase):
         self.transport.switch_to_pc.return_value = {'status': 'sent'}
         self.transport.open_screen.return_value = {'status': 'sent'}
         self.transport.close_screen.return_value = {'status': 'sent'}
+        self.transport.search_youtube.return_value = {'status': 'sent', 'transport': 'dial'}
         for name, value in [('remote', self.transport),
                             ('view', ViewState(Path(folder.name)/'view.json'))]:
             p = patch.object(server, name, value)
@@ -79,6 +80,37 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.transport.send.assert_called_once_with(['KEY_VOLDOWN']*2, 'volume:-2')
         self.assertEqual(data['status'], 'sent')
+
+    def test_youtube_search_selects_context_without_sending_navigation_keys(self):
+        server.view.select('tv')
+        code, data = self.post({'youtube_search': 'Caffè & musica'})
+        self.assertEqual(code, 200)
+        self.assertEqual(data['context']['source'], 'youtube')
+        self.transport.search_youtube.assert_called_once_with('Caffè & musica')
+        self.transport.send.assert_not_called()
+        self.transport.launch_app.assert_not_called()
+
+    def test_invalid_query_is_rejected_before_transport(self):
+        for value in ['', ' ', 'hello\nworld', 'a' * 129, None, [], 12, {'q': 'cat'}]:
+            self.assertEqual(self.post({'youtube_search': value})[0], 400)
+        self.assertEqual(self.post({'youtube_search': 'cat', 'app': 'youtube'})[0], 400)
+        self.transport.search_youtube.assert_not_called()
+
+    def test_busy_server_rejects_search_without_sending(self):
+        with server.busy:
+            self.assertEqual(self.post({'youtube_search': 'cat'})[0], 409)
+        self.transport.search_youtube.assert_not_called()
+
+    def test_failed_search_is_not_retried_or_reported_as_success(self):
+        self.transport.search_youtube.side_effect = RuntimeError('OSError')
+        code, data = self.post({'youtube_search': 'cat'})
+        self.assertEqual(code, 502)
+        self.transport.search_youtube.assert_called_once()
+        self.assertEqual(data['error'], 'OSError')
+        self.assertEqual(data['context']['source'], 'unknown')
+
+    def test_largest_supported_unicode_query_fits_request_limit(self):
+        self.assertEqual(self.post({'youtube_search': '🎵' * 128})[0], 200)
 
     def test_pc_switch_selects_pc_context(self):
         code, data = self.post({'source': 'pc'})

@@ -22,10 +22,11 @@ from epg import Guide
 from health import Health
 from screen_share import ShareRelay
 from sharing_pages import render_share
+from text_input import validate_query
 
 PAGE = (Path(__file__).parent / 'web' / 'index.html').read_text(encoding='utf-8')
 SCRIPT_ASSETS = {f'/assets/{name}.js': (Path(__file__).parent / 'web' / (name+'.js')).read_text(encoding='utf-8')
-                 for name in ('screen', 'share', 'share-worker', 'mp4')}
+                 for name in ('screen', 'share', 'share-worker', 'mp4', 'keyboard')}
 ASSETS = {f'/assets/{name}.png': (Path(__file__).parent / 'web' / 'assets' / f'{name}.png').read_bytes()
           for name in ('youtube', 'netflix', 'primevideo')}
 CSRF = secrets.token_urlsafe(32)  # Browser control key, memory only, never TV token.
@@ -196,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(415, {'error': 'JSON richiesto'})
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            if not 0 < size <= 1024:
+            if not 0 < size <= 2048:
                 raise ValueError('Dimensione richiesta non valida')
             data = json.loads(self.rfile.read(size))
             if not isinstance(data, dict):
@@ -215,7 +216,13 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, {'status': 'view_selected', 'context': view.select(source)})
                 finally:
                     busy.release()
-            if 'screen' in data:
+            if 'youtube_search' in data:
+                try:
+                    validate_query(data['youtube_search'])
+                except ValueError as exc:
+                    return self.reply(400, {'error': str(exc)})
+                keys, action = [], 'youtube:search'
+            elif 'screen' in data:
                 if data['screen'] not in ('open', 'stop'):
                     raise ValueError('Azione schermo non consentita')
                 if data['screen'] == 'open' and (sharing is None or sharing.port is None):
@@ -261,7 +268,9 @@ class Handler(BaseHTTPRequestHandler):
             timeline.emit('Server', 'Comando rifiutato: un altro invio è in corso', 'warning')
             return self.reply(409, {'error': 'Comando in corso, riprova tra poco'})
         try:
-            if 'screen' in data:
+            if 'youtube_search' in data:
+                result = remote.search_youtube(data['youtube_search'])
+            elif 'screen' in data:
                 if data['screen'] == 'open':
                     if sharing.viewer is not None:
                         result = remote.open_screen(receiver_url, reuse=True)

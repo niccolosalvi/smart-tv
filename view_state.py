@@ -45,6 +45,8 @@ class ViewState:
             return self.get()
 
     def after_command(self, payload):
+        if 'youtube_search' in payload:
+            return self.select('youtube', 'last_request')
         if payload.get('screen') == 'stop':
             return self.select('unknown', 'unconfirmed')
         if payload.get('screen') == 'open':
@@ -69,6 +71,6 @@ class ViewState:
         return self.get()
 
     def after_failure(self, payload):
-        if 'screen' in payload or 'power' in payload or 'app' in payload or 'source' in payload or 'channel' in payload or payload.get('key') in NAVIGATION | {'KEY_TV', 'KEY_HDMI1', 'KEY_CHUP', 'KEY_CHDOWN'}:
+        if 'youtube_search' in payload or 'screen' in payload or 'power' in payload or 'app' in payload or 'source' in payload or 'channel' in payload or payload.get('key') in NAVIGATION | {'KEY_TV', 'KEY_HDMI1', 'KEY_CHUP', 'KEY_CHDOWN'}:
             return self.select('unknown', 'unconfirmed')
         return self.get()

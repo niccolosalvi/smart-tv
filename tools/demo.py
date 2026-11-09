@@ -30,6 +30,8 @@ def main():
             open_screen = send
             close_screen = send
 
+            search_youtube = send
+
             def launch_app(self, app):
                 return {**self.send(), 'app_name': server.APPS[app]['name']}
 

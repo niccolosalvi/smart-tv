@@ -27,6 +27,7 @@ real device identifiers, credentials, household addresses or diagnostic logs.
 - Favorites with current and next programmes, channel keypad and direct entry.
 - Volume in two-step increments, mute and previous/next channel on one row.
 - Directional navigation and playback controls in streaming views.
+- YouTube search from the phone/PC keyboard, with results opened directly in the TV app.
 - Wake-on-LAN and a short Power press for standby.
 - Device/server status, uptime, memory and systemd service/timer status.
 - External XMLTV guide refreshed every 24 hours without opening the browser;
@@ -95,6 +96,33 @@ python -m tools.demo
 
 The isolated demonstration runs at [localhost:8766](http://127.0.0.1:8766).
 All its commands, schedules and telemetry are simulated.
+
+## Search YouTube from your device
+
+In the YouTube or full-controls view, tap **Cerca un video sulla TV**, type with
+normal phone/PC keyboard input, and press **Cerca** (or the keyboard's Search/Enter
+key). The results open in the installed YouTube app on the TV. You do not need
+to select its search field, configure a character grid, or move between letters.
+Spaces, accents and punctuation are preserved. Queries accept up to 128 characters.
+
+The server sends one local DIAL request to the TV's YouTube application on port
+8080, with `launch=search` and a UTF-8 URL-encoded `q` parameter. It bypasses
+Samsung's native IME, which YouTube's custom keyboard can ignore. The DIAL Origin
+header is set to YouTube's origin; no Google account, API key, cloud control API
+or additional dependency is needed. The app naturally uses YouTube's servers for
+its searches. Query contents are excluded from logs and saved UI context.
+
+**Verified on the UE49KS7000 with YouTube already open:** the user confirmed the
+requested results appeared for a search sent via DIAL. The WebSocket deep-link
+route opened the app but ignored the query. An empty DIAL query kept the previous
+results, so focusing the dashboard input only opens your device's keyboard:
+**Cerca** submits the search to the TV. There is no per-keystroke synchronization
+with the TV field. Use the directional controls to select a result.
+
+The server cannot read the TV's query/results; the interface reports that the
+request was sent rather than claiming visual confirmation for every search.
+Failed/uncertain requests are never retried automatically. Restart the server
+after updating the files and reload the dashboard on each device.
 
 ## Install as a Raspberry Pi service
 
