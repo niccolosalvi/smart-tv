@@ -34,6 +34,13 @@ After setup, open `https://RASPBERRY_IP:8766/`, then **Condividi dal PC** and
 receiver opens automatically. No Python installation or command on the PC is
 required for normal use.
 
+Audio uses a second connection on the same WS/WSS ports, with no extra service
+or codec package on the Raspberry. Update `audio_share.py`, the sharing modules,
+and all four `web/audio-*.js` files together with the existing web assets. Reload
+the PC page and reopen the TV receiver after restarting the service. To test,
+enable audio in both the page and the browser's capture dialog. If the receiver
+shows **Attiva audio**, select it once with the TV remote to unlock playback.
+
 ## Service installation
 Run from the repository root as your ordinary Raspberry user, not root:
 

@@ -10,6 +10,7 @@ from contextlib import AsyncExitStack
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
+from audio_share import AudioRelay
 
 MAX_FRAME = 512 * 1024
 WINDOW = 3
@@ -29,6 +30,7 @@ class ShareRelay:
         self.inflight = {}
         self.metrics = {'packets': 0, 'bytes': 0, 'ack_ms': 0, 'buffer_ms': 0}
         self.avc_failed_agents = set()
+        self.audio = AudioRelay()
         self.thread = None
         self.error = None
         self.ready = threading.Event()
@@ -87,6 +89,7 @@ class ShareRelay:
             asyncio.run_coroutine_threadsafe(self._end_session(), self.loop).result(timeout=5)
 
     async def _end_session(self):
+        await self.audio.end_session()
         sender, viewer = self.sender, self.viewer
         if viewer:
             try:
@@ -244,10 +247,12 @@ class ShareRelay:
                 key, role = hello.get('key'), hello.get('role')
                 if (not isinstance(key, str) or
                         not secrets.compare_digest(key, self.key) or
-                        role not in ('sender', 'viewer')):
+                        role not in ('sender', 'viewer', 'audio_sender', 'audio_viewer')):
                     raise ValueError()
             except (ValueError, TypeError, UnicodeError, asyncio.TimeoutError):
                 return await ws.close(1008, 'Accesso non consentito')
+            if role in ('audio_sender', 'audio_viewer'):
+                return await self.audio.handle(ws, hello)
             if getattr(self, role) is not None:
                 return await ws.close(1008, 'Un dispositivo di questo tipo è già collegato')
             setattr(self, role, ws)
@@ -316,3 +321,5 @@ class ShareRelay:
                         await asyncio.wait_for(self.viewer.send('stop'), self.ack_timeout)
                     except (ConnectionClosed, asyncio.TimeoutError):
                         pass
+                if role == 'sender':
+                    await self.audio.end_session()

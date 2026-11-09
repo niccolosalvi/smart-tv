@@ -26,7 +26,8 @@ from text_input import validate_query
 
 PAGE = (Path(__file__).parent / 'web' / 'index.html').read_text(encoding='utf-8')
 SCRIPT_ASSETS = {f'/assets/{name}.js': (Path(__file__).parent / 'web' / (name+'.js')).read_text(encoding='utf-8')
-                 for name in ('screen', 'share', 'share-worker', 'mp4', 'keyboard')}
+                 for name in ('screen', 'share', 'share-worker', 'mp4', 'keyboard',
+                              'audio-share', 'audio-capture', 'audio-worker', 'audio-receiver')}
 ASSETS = {f'/assets/{name}.png': (Path(__file__).parent / 'web' / 'assets' / f'{name}.png').read_bytes()
           for name in ('youtube', 'netflix', 'primevideo')}
 CSRF = secrets.token_urlsafe(32)  # Browser control key, memory only, never TV token.
@@ -135,7 +136,8 @@ class Handler(BaseHTTPRequestHandler):
                 'receiver_connected': sharing is not None and sharing.viewer is not None,
                 'sender_connected': sharing is not None and sharing.sender is not None,
                 'receiver_capabilities': sharing.viewer_info if sharing else {},
-                'transmission': sharing.metrics.copy() if sharing else {}}
+                'transmission': sharing.metrics.copy() if sharing else {},
+                'audio': sharing.audio.snapshot() if sharing else {}}
 
     def do_GET(self):
         self.correlation = None

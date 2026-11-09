@@ -9,6 +9,7 @@ let windowSize=3,reservations=0,nextSeq=1,codec='',closePromise=null,needClose=f
 let pending=new Map(),statsTimer=null,statsTime=0,frames=0,bytes=0,acks=0,rtt=0,bufferMs=0,captureMode='';
 let encoderGeneration=0;
 let openingPromise=null,connectTimer=null;
+let audioSender=null;
 const supported=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia&&window.Worker&&window.VideoFrame;
 $('open-tv').disabled=!config.available;
 async function tvCommand(action,keepalive=false){
@@ -34,11 +35,13 @@ else if(!supported){
 function destroyWorker(){encoderGeneration++;if(worker){worker.terminate();worker=null;}reservations=0;pending.clear();}
 function stop(text,keepalive=false){
  const close=needClose;needClose=false;generation++;running=false;clearInterval(statsTimer);clearTimeout(connectTimer);destroyWorker();
+ if(audioSender){audioSender.stop();audioSender=null;}
  if(reader){reader.cancel().catch(()=>{});reader=null;}
  if(stream){stream.getTracks().forEach(track=>{track.onended=null;track.stop();});stream=null;}
  if(socket){socket.onclose=socket.onerror=socket.onmessage=null;socket.close();socket=null;}
  $('preview').srcObject=null;$('preview').hidden=true;$('stop').disabled=true;
  $('width').disabled=$('fps').disabled=$('transport').disabled=false;
+ $('audio-enabled').disabled=$('audio-quality').disabled=false;
  message(text||'Condivisione terminata.');
  if(close&&!closePromise){
   $('start').disabled=true;$('tv-status').textContent='Chiusura del ricevitore e del browser sulla TV…';
@@ -108,18 +111,23 @@ function updateStats(){
  if(!running)return;const now=performance.now(),elapsed=(now-statsTime)/1000;
  if(pending.size&&now-Math.min(...[...pending.values()].map(item=>item.sent))>10000){stop('La TV non risponde. Riprova la condivisione.');return;}
  if(!worker)return;
- message((codec==='h264'?'H.264':'Immagini adattive')+' · '+(frames/elapsed).toFixed(1)+' immagini/s ricevute · '+(bytes*8/elapsed/1000000).toFixed(2)+' Mb/s · conferma TV '+Math.round(acks?rtt/acks:0)+' ms'+(codec==='h264'?' · buffer '+Math.round(bufferMs)+' ms':'')+captureMode+' · senza audio');
+ message((codec==='h264'?'H.264':'Immagini adattive')+' · '+(frames/elapsed).toFixed(1)+' immagini/s ricevute · '+(bytes*8/elapsed/1000000).toFixed(2)+' Mb/s video · conferma TV '+Math.round(acks?rtt/acks:0)+' ms'+(codec==='h264'?' · buffer '+Math.round(bufferMs)+' ms':'')+captureMode);
  frames=bytes=acks=rtt=0;statsTime=now;
 }
 $('start').onclick=async()=>{
  const epoch=++generation;$('start').disabled=true;message('Scegli cosa condividere nel browser.');
  try{
   const fps=Number($('fps').value),width=Number($('width').value);
-  const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:fps,max:fps},width:{ideal:width,max:width},height:{max:720}},audio:false});
+  const wantAudio=$('audio-enabled').checked,voice=$('audio-quality').value==='voice';
+  if(wantAudio)audioSender=new ScreenAudioSender({key:config.key,ws_url:wsUrl},{channels:voice?1:2,bitrate:voice?64000:128000},text=>{$('audio-status').textContent=text;});
+  else $('audio-status').textContent='Audio disattivato.';
+  const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:fps,max:fps},width:{ideal:width,max:width},height:{max:720}},audio:wantAudio?{echoCancellation:false,noiseSuppression:false,autoGainControl:false,suppressLocalAudioPlayback:true}:false,systemAudio:wantAudio?'include':'exclude'});
   if(epoch!==generation){captured.getTracks().forEach(track=>track.stop());return;}
   stream=captured;needClose=true;forceJPEG=$('transport').value==='jpeg';
   const track=stream.getVideoTracks()[0];try{track.contentHint='detail';}catch(ignored){}
   track.onended=()=>stop();$('stop').disabled=false;$('width').disabled=$('fps').disabled=$('transport').disabled=true;
+  $('audio-enabled').disabled=$('audio-quality').disabled=true;
+  if(audioSender)audioSender.start(stream.getAudioTracks()[0]);
   $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
   const response=await fetch('/api/share');const live=await response.json();
   if(epoch!==generation)return;

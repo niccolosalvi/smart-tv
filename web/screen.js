@@ -1,6 +1,7 @@
 /* ES5 receiver for Samsung 2016: AVC/MSE first, JPEG rectangles as fallback. */
 (function(){
  var config=JSON.parse(document.getElementById('screen-config').textContent);
+ var audio=new ScreenAudioReceiver(config);
  var socket=null,image=document.getElementById('frame'),canvas=document.getElementById('screen-canvas');
  var video=document.getElementById('screen-video'),panel=document.getElementById('panel'),status=document.getElementById('status');
  var URLApi=window.URL||window.webkitURL,MS=window.MediaSource||window.WebKitMediaSource;
@@ -28,7 +29,7 @@
  function closeManaged(broadcast){
   if(closed)return;closed=true;
   if(broadcast){try{localStorage.setItem('smart-tv-close-receivers',String(Date.now()));}catch(ignored){}}
-  reset();if(socket){socket.onclose=null;socket.close();}show('Condivisione terminata. Chiusura browser richiesta.');
+  reset();audio.close();if(socket){socket.onclose=null;socket.close();}show('Condivisione terminata. Chiusura browser richiesta.');
   try{window.close();}catch(ignored){}
  }
  window.addEventListener('storage',function(event){if(event.key==='smart-tv-close-receivers')closeManaged(false);});
@@ -113,7 +114,7 @@
   if(queue.length>=3){fallback();return;}queue.push(item);pump();
  }
  function connect(){
-  closed=false;reset();clearTimeout(timer);
+  closed=false;reset();audio.close();clearTimeout(timer);
   if(socket){socket.onclose=socket.onerror=socket.onmessage=null;socket.close();}
   show('Connessione al Raspberry…');
   if(!config.available){show('Relay non disponibile. Ricarica la pagina.');return;}
@@ -124,16 +125,16 @@
    connection.onmessage=function(event){clearTimeout(timer);
     if(typeof event.data!=='string'){receive(event.data);return;}
     if(event.data==='close'){closeManaged(true);return;}
-    if(event.data==='stop'){reset();show('Condivisione terminata sul PC.');return;}
-    try{var data=JSON.parse(event.data);if(data.type==='configure')configure(data);else if(data.type==='ready')show('TV collegata. Avvia la condivisione sul PC.');}
+    if(event.data==='stop'){reset();audio.close();show('Condivisione terminata sul PC.');return;}
+    try{var data=JSON.parse(event.data);if(data.type==='configure')configure(data);else if(data.type==='ready'){audio.open();show('TV collegata. Avvia la condivisione sul PC.');}}
     catch(error){show('Messaggio ricevitore non valido.');}
    };
-   connection.onclose=function(event){clearTimeout(timer);reset();show('Connessione chiusa. '+(event.reason||'Ricarica la pagina o premi Ricollega.'));};
+   connection.onclose=function(event){clearTimeout(timer);reset();audio.close();show('Connessione chiusa. '+(event.reason||'Ricarica la pagina o premi Ricollega.'));};
    connection.onerror=function(){show('Collegamento WebSocket non riuscito.');};
   }catch(error){show('WebSocket non disponibile: '+error.message);}
  }
  window.onerror=function(){show('Errore del ricevitore. Riapri la pagina dalla dashboard.');};
  document.getElementById('reconnect').onclick=connect;
  document.getElementById('fullscreen').onclick=function(){var root=document.documentElement,request=root.requestFullscreen||root.webkitRequestFullscreen;if(request)request.call(root);};
- window.onpagehide=function(){reset();if(socket)socket.close();};connect();
+ window.onpagehide=function(){reset();audio.close();if(socket)socket.close();};connect();
 }());

@@ -84,7 +84,7 @@ def make_handler(page, nonce, ws_url, config=None):
                 return
             if self.path == '/api/share' and config:
                 return self.json_reply(200, config)
-            asset = self.path in ['/assets/'+name+'.js' for name in ('share', 'share-worker', 'mp4')]
+            asset = self.path in ['/assets/'+name+'.js' for name in ('share', 'share-worker', 'mp4', 'audio-share', 'audio-capture', 'audio-worker')]
             if self.path != '/' and not asset:
                 self.send_error(404)
                 return

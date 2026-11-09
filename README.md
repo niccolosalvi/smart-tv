@@ -147,7 +147,8 @@ window or tab and encodes low-delay H.264 video with WebCodecs in a worker; the
 Raspberry forwards the fragmented MP4 packets in RAM over
 WebSockets to a page opened in the TV browser. No HDMI connection, TV application
 installation or video transcoding on the Raspberry is required. Images are not
-written to logs or disk. This prototype has **no audio or phone screen capture**.
+written to logs or disk. Optional shared audio is compressed in the PC browser;
+phone screen capture remains unsupported.
 Native browser launch, receiver connection and compressed image decode/ACK were
 verified on the target Samsung UE49KS7000. Synthetic capture benchmarks use the
 real Raspberry and TV; physical screen-to-panel latency remains unmeasured.
@@ -164,6 +165,10 @@ For normal use, **nothing runs on the PC except its browser**:
 2. Click **Condividi dal PC**, then **Condividi** and choose the screen, window
    or tab in the browser dialog. The TV receiver opens automatically if it is
    not connected. The browser always asks for capture permission each session.
+   To include sound, leave **Condividi anche l’audio** enabled and select the
+   browser dialog's tab/system-audio option. A capture may contain video only;
+   the page reports this and keeps the screen sharing running. No microphone
+   permission is requested.
 3. Click **Interrompi**, close the sharing tab, or use the browser's native stop
    control to finish. **Apri sulla TV** can reopen the receiver if needed.
 
@@ -184,7 +189,44 @@ Default selection is **1280 × 720 maximum, 30 images/s requested**. The selecto
 retains 5/10/15/30/60/90/120; the video path processes at most 60 images/s and the
 compatibility path at most 30. A requested value is not a throughput guarantee.
 Capture is limited to the chosen size before processing. The browser still asks
-for screen permission each session. There is no audio in this implementation.
+for screen permission each session.
+
+### Shared audio
+
+**Musica e video** requests stereo AAC-LC at 128 kb/s; **Voce** requests mono at
+64 kb/s, using 96 kb/s when the PC's native AAC encoder rejects 64 kb/s. These
+are encoder targets, not measured wire rates. Short ADTS groups include one
+preroll frame to preserve decoder overlap across independently decoded packets.
+Framing and preroll add overhead. If native AAC encoding or TV decoding is
+unavailable, independently decodable IMA ADPCM blocks use 24 kHz at about
+194 kb/s stereo or 97 kb/s mono, including packet headers. This fallback trades
+audio bandwidth for compatibility without a codec installation on the TV.
+The target Tizen 2.4/SamsungBrowser 1.1 selects ADPCM immediately: the live AAC
+test interrupted its browser session, while ADPCM playback with moving images
+was measured and the user confirmed continuous sound from the TV speakers.
+
+AudioWorklet captures audio into transferable sample buffers; a dedicated worker
+encodes it. An older-browser ScriptProcessor fallback is available. A separate
+WebSocket on the existing WS/WSS ports prevents large image writes from holding
+the audio stream's application queue. The Raspberry validates and forwards
+compressed packets in RAM without transcoding. Both channels share the existing
+Host/Origin/key checks and trusted-LAN access model; no extra port is required.
+
+The TV uses Web Audio rather than its unreliable video MSE path. There are at
+most three unacknowledged audio packets, a bounded decode queue and a short
+jitter buffer. Stale packets are discarded and codec blocks carry restart state
+so a missing block cannot corrupt all later audio. Playback scheduling limits
+buffer growth rather than accumulating seconds of delayed sound. These are
+best-effort live streams: audio and video do not share a hardware playback clock,
+and exact lip synchronization is not guaranteed. If autoplay is blocked, press
+**Attiva audio** on the TV. Normal stopping closes capture, audio nodes, workers
+and both transport channels. Unexpected audio failure does not stop the images.
+
+Audio-source availability depends on browser, OS and selected capture surface.
+Desktop Chrome/Edge on Windows can offer tab/system audio; a selected window
+may provide video only. The page never silently substitutes microphone capture.
+
+### Video transport
 
 The preferred transport is AVC baseline in fragmented MP4, encoded using
 WebCodecs with realtime latency mode and a preference for hardware acceleration.
