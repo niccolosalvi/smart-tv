@@ -48,6 +48,11 @@ class ViewStateTests(unittest.TestCase):
         self.assertEqual(self.view.after_command({'volume': 2})['source'], 'pc')
         self.assertEqual(self.view.after_failure({'source': 'pc'})['source'], 'unknown')
 
+    def test_screen_button_selects_network_screen_and_keeps_volume_context(self):
+        self.assertEqual(self.view.after_command({'screen': 'open'})['source'], 'screen')
+        self.assertEqual(self.view.after_command({'volume': 2})['source'], 'screen')
+        self.assertEqual(self.view.after_failure({'screen': 'open'})['source'], 'unknown')
+
     def test_power_request_invalidates_source(self):
         self.view.select('netflix')
         self.assertEqual(self.view.after_command({'power': 'off'})['source'], 'unknown')

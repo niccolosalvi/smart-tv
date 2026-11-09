@@ -1,6 +1,40 @@
 # Raspberry Pi deployment
 
 Requires Python 3.10+, Raspberry Pi OS with systemd, and network access to the TV.
+Screen sharing additionally uses LAN TCP port 8767 alongside dashboard port 8765.
+After updating the checkout, install the updated `requirements.txt` in `.venv`
+and restart `smart-tv`; no HDMI connection is used. The TV must keep `/screen`
+open in its browser. The HTTPS workflow requires no launcher on the PC.
+
+## HTTPS screen sharing
+
+Set `SMART_TV_TLS_CERT` and `SMART_TV_TLS_KEY` in the existing private
+`~/.config/smart-tv/server.env`, pointing to a server certificate and its private
+key. The certificate must include the Raspberry's numeric LAN IP in its Subject
+Alternative Name and be trusted by each PC browser. Preserve all existing TV
+settings. Keep the key outside the repository, mode 600, and its directory mode
+700. Restart `smart-tv` after configuration. An invalid TLS configuration prevents
+startup; retain a backup of both application files and the environment file.
+
+The existing service also starts HTTPS on 8766 and WSS on 8768. Ports can be
+changed with `--https-port` and `--wss-port`; HTTP 8765/WS 8767 remain the TV path.
+The PC and TV share one relay. Do not redirect the old TV browser to HTTPS.
+
+For an isolated LAN, a self-signed **server** certificate with `CA:FALSE` and
+`extendedKeyUsage=serverAuth` can be generated on the Raspberry with OpenSSL.
+Bind it to the actual IP, export only its public certificate for the PC, and
+verify its fingerprint before the one-time trust installation. The private key
+must remain on the Raspberry. On Windows the certificate can be imported for
+the current user; trust configuration is a separate explicit setup step, not
+something a web page installs silently. Renew the certificate before expiry and
+update trust on the PC when replacing a self-signed certificate.
+
+After setup, open `https://RASPBERRY_IP:8766/`, then **Condividi dal PC** and
+**Condividi**. The browser asks which screen/window/tab to capture, then the TV
+receiver opens automatically. No Python installation or command on the PC is
+required for normal use.
+
+## Service installation
 Run from the repository root as your ordinary Raspberry user, not root:
 
 ```sh

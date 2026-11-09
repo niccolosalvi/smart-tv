@@ -6,8 +6,10 @@ import threading
 import time
 import urllib.request
 import websocket
+import ipaddress
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from samsungtvws import SamsungTVWS
 from diagnostics import timeline, tv_event
@@ -136,6 +138,38 @@ class Remote:
         return self.send(['KEY_EXIT', 'KEY_HDMI1', 'KEY_EXIT'], 'source:pc:hdmi1',
                          pauses=[2.0, 0.35, 0.35])
 
+    def open_screen(self, url, reuse=False):
+        # Only the local receiver is allowed, never an arbitrary browsing URL.
+        try:
+            target = urlsplit(url)
+            address = ipaddress.IPv4Address(target.hostname)
+            if (target.scheme != 'http' or not target.port or
+                    target.path != '/screen' or target.query or target.fragment or
+                    target.username or target.password or address.is_loopback or
+                    address.is_unspecified or address.is_multicast):
+                raise ValueError()
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError('Indirizzo del ricevitore non valido') from None
+        with self.lock:
+            if not self.tv.is_alive():
+                self.connect()
+            started = time.perf_counter()
+            try:
+                timeline.emit('Server → TV', 'WS apertura browser sulla pagina schermo PC')
+                # Native launch passes the URL to the browser, including when
+                # another application is foregrounded. No keyboard focus needed.
+                if reuse:
+                    # Foreground the existing browser without opening another URL tab.
+                    self.tv.run_app('org.tizen.browser', 'NATIVE_LAUNCH', '')
+                else:
+                    self.tv.open_browser(url)
+                return record('screen:open', started, 'sent', transport='websocket',
+                              note='Apertura browser richiesta; caricamento pagina non confermato')
+            except Exception as exc:
+                self.tv.close()
+                record('screen:open', started, 'error', error_type=type(exc).__name__)
+                raise RuntimeError(type(exc).__name__) from None
+
     def launch_app(self, app):
         if not isinstance(app, str) or app not in APPS:
             raise ValueError('App non consentita')
@@ -170,6 +204,33 @@ class Remote:
                     note='Stato dichiarato dalla TV; riproduzione e accesso account non verificati')
             except Exception as exc:
                 record('app:' + app, started, 'error', error_type=type(exc).__name__)
+                raise RuntimeError(type(exc).__name__) from None
+
+    def close_screen(self):
+        # The native browser isn't exposed by the 2016 TV REST applications API
+        # (returns 404). Samsung defines a long Return press as forced app exit.
+        with self.lock:
+            if not self.tv.is_alive():
+                self.connect()
+            started = time.perf_counter()
+            pressed = False
+            try:
+                timeline.emit('Server → TV', 'WS Return lungo: termina browser')
+                self.tv.send_key('KEY_RETURN', cmd='Press', key_press_delay=0)
+                pressed = True
+                time.sleep(2)
+                self.tv.send_key('KEY_RETURN', cmd='Release', key_press_delay=0)
+                pressed = False
+                return record('screen:stop', started, 'sent', transport='websocket',
+                              note='Uscita forzata dal browser richiesta; elenco schede non esposto dalla TV')
+            except Exception as exc:
+                if pressed:
+                    try:
+                        self.tv.send_key('KEY_RETURN', cmd='Release', key_press_delay=0)
+                    except Exception:
+                        pass
+                self.tv.close()
+                record('screen:stop', started, 'error', error_type=type(exc).__name__)
                 raise RuntimeError(type(exc).__name__) from None
 
     def close(self):

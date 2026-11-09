@@ -3,6 +3,9 @@
 The application uses samsungtvws 3.0.6, installed separately through pip. Refer
 to the upstream project and its license: https://github.com/xchwarze/samsung-tv-ws-api.
 
+The screen-sharing relay uses websockets 15.0.1, installed separately through pip,
+under the BSD 3-Clause license: https://github.com/python-websockets/websockets.
+
 YouTube, Netflix and Prime Video names and logos belong to their respective
 owners. The unmodified icons in web/assets/ identify the corresponding remote
 buttons. Their official download URLs are recorded in web/assets/README.md.

@@ -27,6 +27,8 @@ def main():
 
             switch_to_pc = send
             switch_to_tv = send
+            open_screen = send
+            close_screen = send
 
             def launch_app(self, app):
                 return {**self.send(), 'app_name': server.APPS[app]['name']}

@@ -32,6 +32,7 @@ real device identifiers, credentials, household addresses or diagnostic logs.
 - External XMLTV guide refreshed every 24 hours without opening the browser;
   failed downloads retry after 6 hours while keeping the last valid cache.
 - A command timeline with request IDs and timing, plus rotating diagnostic logs.
+- Experimental PC screen sharing over LAN WebSockets, with a TV browser receiver.
 - Optional systemd startup at boot and daily server refresh at 11:00 Europe/Rome.
 
 ## Requirements and compatibility
@@ -44,7 +45,7 @@ confirmation on the target TV. A successful send is not a TV execution ACK.
 
 ## Run locally
 
-Create a virtual environment and install the single application dependency:
+Create a virtual environment and install the application dependencies:
 
 ```sh
 python -m venv .venv
@@ -111,6 +112,93 @@ See [deployment instructions](deploy/README.md) for paths, management and rollba
 Use a DHCP reservation on your router to keep the server's address stable.
 Network configuration and SSH credentials are deliberately not included here.
 
+## PC screen sharing (experimental)
+
+The Raspberry remains connected by network only. The PC browser captures a screen,
+window or tab and encodes low-delay H.264 video with WebCodecs in a worker; the
+Raspberry forwards the fragmented MP4 packets in RAM over
+WebSockets to a page opened in the TV browser. No HDMI connection, TV application
+installation or video transcoding on the Raspberry is required. Images are not
+written to logs or disk. This prototype has **no audio or phone screen capture**.
+Native browser launch, receiver connection and compressed image decode/ACK were
+verified on the target Samsung UE49KS7000. Synthetic capture benchmarks use the
+real Raspberry and TV; physical screen-to-panel latency remains unmeasured.
+The TV's Tizen 2.4/SamsungBrowser 1.1 advertises AVC/MSE but stalls during actual
+append/decode tests. This browser profile therefore selects adaptive JPEG/PNG
+images directly. Other receivers try AVC and fall back if initialization or
+append stalls. No WebRTC is required.
+
+For normal use, **nothing runs on the PC except its browser**:
+
+1. Open the remote dashboard using its trusted HTTPS address, normally
+   `https://RASPBERRY_LAN_IP:8766/`, in desktop Chrome or Edge.
+   The HTTP dashboard also links **Condividi dal PC** to that HTTPS sharing page.
+2. Click **Condividi dal PC**, then **Condividi** and choose the screen, window
+   or tab in the browser dialog. The TV receiver opens automatically if it is
+   not connected. The browser always asks for capture permission each session.
+3. Click **Interrompi**, close the sharing tab, or use the browser's native stop
+   control to finish. **Apri sulla TV** can reopen the receiver if needed.
+
+HTTPS must be configured once on the Raspberry, and its certificate must be
+trusted once on each PC. An untrusted or expired certificate is not a supported
+capture setup. See the deployment guide for configuration. The TV continues to
+use HTTP port **8765** and WS port **8767**; the PC uses HTTPS **8766** and WSS
+**8768**. Both socket listeners share one sender/receiver session. The Raspberry
+stays on the network only; no HDMI is used. A LAN HTTP origin cannot capture the
+screen directly. Mobile screen capture remains unsupported by this prototype.
+
+The optional older `python -m tools.share_screen --server http://SERVER_IP:8765`
+localhost launcher remains available for deployments without HTTPS, but is not
+required by the HTTPS workflow. After a service restart, reload the sharing page
+and reopen the TV receiver to refresh the in-memory access key.
+
+Default selection is **1280 × 720 maximum, 30 images/s requested**. The selector
+retains 5/10/15/30/60/90/120; the video path processes at most 60 images/s and the
+compatibility path at most 30. A requested value is not a throughput guarantee.
+Capture is limited to the chosen size before processing. The browser still asks
+for screen permission each session. There is no audio in this implementation.
+
+The preferred transport is AVC baseline in fragmented MP4, encoded using
+WebCodecs with realtime latency mode and a preference for hardware acceleration.
+OffscreenCanvas scaling and encoding run in a worker. MediaStreamTrackProcessor
+feeds transferable VideoFrames without a main-thread timer or RGBA readback on
+the video path. On browsers without that processor, a video-frame callback path
+is used and the controller should remain visible. Input frames are discarded
+before encoding when credits run out; encoded predictive frames are never
+arbitrarily dropped. The Raspberry does not transcode.
+
+There are at most three unacknowledged network packets, two encoder input jobs,
+one pending AVC sample used to calculate its duration, and up to two fragments
+awaiting a grouped packet. The MP4 muxer groups at most three frames per packet;
+the TV appends them to MSE, trims old buffered media and catches
+up to the live edge if lag exceeds 350 ms. Packets are capped at 512 KiB. The
+fallback compares pixels exactly in 64-pixel tiles and packs changed tiles into
+one compressed atlas. It chooses JPEG or PNG by encoded size (PNG candidates for
+tiles/flat-color screens), skips static updates, refreshes the complete image
+periodically, and adapts JPEG quality to acknowledgement time. One previous RGBA
+frame is retained for comparison. The canvas receiver avoids per-frame DOM layout.
+
+The UI shows rolling packets/images received per second, bandwidth and TV ACK
+round-trip time. An H.264 ACK confirms SourceBuffer append, **not physical panel
+presentation**; the displayed TV buffer is additional media ahead of playback.
+These values are diagnostics, not experimentally measured glass-to-glass latency.
+Only one capture sender and one TV receiver are accepted. Slow receivers cause
+capture-frame skipping rather than an unbounded transmission queue.
+
+**Interrompi**, the browser capture-stop control and normal sharing-tab closure
+stop capture and request receiver/browser cleanup. Managed receiver tabs use a
+same-origin storage signal plus `window.close()`. The Raspberry sends a long
+Return press to force TV app exit (the native browser's REST app-close endpoint
+returns 404 on this TV). The API does not expose the browser's persistent tab
+list: clearing/restoring saved tabs cannot be guaranteed, and browsing history,
+cookies and logins are not erased. Reload both pages after a service restart.
+
+Sharing inherits the dashboard's trusted-LAN access model: another LAN user who
+can open the dashboard can obtain its current access key and join a free sharing
+slot. The PC-to-Raspberry leg uses HTTPS/WSS when enabled; the legacy TV leg
+uses HTTP/WS. There is no personal login or pairing code. The WebSocket checks its destination Host, browser Origin and access key.
+No screen capture starts without the PC user's browser selection.
+
 ## Guide and inferred state
 
 The guide uses Open-EPG's `italy8.xml.gz`, mapped to the six favorites. The server
@@ -144,10 +232,11 @@ runtime logs, token files or copied device configuration.
 python -m unittest discover -s tests -v
 ```
 
-The 47 tests use mocked TV transport and temporary state. They cover command
+The tests use mocked TV transport and temporary state. They cover command
 validation, two-step volume, source context, power sequences, EPG parsing/cache,
-automatic daily refresh/retry, diagnostics and host health. No real TV commands
-are sent by this suite.
+automatic daily refresh/retry, diagnostics and host health. Sharing tests use real
+loopback WebSockets to exercise access checks, bounded frames, display ACKs,
+slow/disconnected receivers and HTTP pages. No real TV commands are sent by this suite.
 
 With a server running, check HTTP endpoints and rejected inputs:
 

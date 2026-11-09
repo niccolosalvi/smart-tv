@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Schermo PC · Salotto</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#e8ecec;font-family:Arial,sans-serif}#frame,#screen-canvas,#screen-video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;display:none}#panel{position:absolute;bottom:5%;left:5%;right:5%;padding:20px;background:#182023;font-size:22px;line-height:1.5}h1{font-size:28px;margin:0 0 12px}button{padding:12px 20px;margin:12px 8px 0 0;background:#c0dfc8;border:0;border-radius:6px;font-size:20px;color:#182023}#status{margin:0}</style></head>
+<body><img id="frame" alt="Schermo condiviso dal PC"><canvas id="screen-canvas" style="display:none"></canvas><video id="screen-video" muted autoplay playsinline webkit-playsinline style="display:none"></video><div id="panel"><h1>Schermo PC</h1><p id="status" role="status">Connessione…</p><button id="reconnect">Ricollega</button><button id="fullscreen">Schermo intero</button></div>
+<script type="application/json" id="screen-config">__CONFIG__</script>
+<script src="/assets/screen.js"></script></body></html>
