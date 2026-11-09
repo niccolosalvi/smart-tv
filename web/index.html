@@ -1,14 +1,235 @@
 <!doctype html>
-<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101315"><title>Salotto · Telecomando</title>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#09090b"><title>Salotto · Telecomando</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;background:#101315;color:#e8ecec;font-size:14px}*{box-sizing:border-box}body{margin:0;padding:max(18px,env(safe-area-inset-top)) 14px max(18px,env(safe-area-inset-bottom));background:#101315}main{max-width:360px;margin:auto}button,input,select{font:inherit;color:inherit}button{border:1px solid #2b3236;border-radius:12px;background:#1b2023;min-height:44px;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:7px;-webkit-tap-highlight-color:transparent}button:hover{background:#262d31}button:active{transform:scale(.96);background:#344048}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #b3ddbd;outline-offset:3px}button[aria-disabled="true"]{opacity:.4;cursor:wait}[hidden]{display:none!important}.icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}h1{font-size:22px;letter-spacing:-.8px;margin:0;font-weight:650}.sub{display:flex;align-items:center;gap:5px;color:#838f95;font-size:10px;margin-top:4px}.dot{width:5px;height:5px;border-radius:50%;background:#a5cdb1;display:inline-block}.power-tools{display:flex;gap:6px}.power-tools button{min-height:36px;height:36px;padding:0 10px;border-radius:10px;font-size:10px;gap:4px}.power-tools .icon{width:15px;height:15px}.power-on{color:#badcc3}.power-off{color:#c4b7b6}.sources{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:12px}.sources button{min-height:52px;padding:7px 2px;flex-direction:column;gap:4px;font-size:10px;color:#a2adb1;background:#171c1f}.sources button.active{color:#d8eee0;background:#23352b;border-color:#54715e}.app-mark{font-size:17px;line-height:19px;font-weight:750}.netflix{color:#ee6571}.prime{color:#87c9e9}.sources .youtube{color:#e58f90}.context{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 1px}.context-title{font-size:11px;color:#97a4aa;margin:0}.context select{font-size:11px;border:0;border-radius:8px;background:#1a2023;padding:8px 22px 8px 9px;max-width:155px;min-height:34px}.context-note{font-size:10px;line-height:1.4;color:#6e7d84;margin:6px 1px 12px;min-height:14px}section{margin:0}h2{font-size:10px;font-weight:500;letter-spacing:1.3px;text-transform:uppercase;color:#89979d;margin:0 0 10px}.panel{border-top:1px solid #242c30;padding-top:14px;margin-top:10px}.pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(3,64px);gap:5px;width:fit-content;margin:0 auto 10px;padding:8px;border:1px solid #2d383d;border-radius:50%;background:radial-gradient(circle,#252d31,#191f22)}.pad button{background:transparent;border-color:transparent;border-radius:50%;min-height:0}.pad button:hover{background:#303b41}.pad .icon{width:24px;height:24px}.pad .center{background:#c0dfc8;color:#1d3123;font-size:14px;font-weight:700;border:0;box-shadow:0 2px 10px #0003}.pad .center:hover{background:#d4ebd9}.nav-shortcuts{display:flex;justify-content:center;gap:12px;margin-bottom:12px}.nav-shortcuts button{width:54px;min-height:38px;background:transparent;border:0;color:#a9b7bd}.media{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}.media button{min-height:42px}.media .pause{background:#c0dfc8;color:#1d3123;border-color:#c0dfc8}.volume{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding-top:12px;border-top:1px solid #242c30}.volume button{min-height:40px}.volume span{color:#9aa9ae;font-size:11px}form{display:grid;grid-template-columns:1fr 52px;gap:8px;margin-bottom:10px}input{width:100%;min-width:0;height:42px;background:#191f22;border:1px solid #2e393f;border-radius:10px;padding:0 13px;font-size:16px}input::placeholder{font-size:12px;color:#6e7b82}form button{min-height:42px;background:#c0dfc8;color:#1d3123;border-color:#c0dfc8}.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:14px}.numbers button{height:48px;font-size:19px;font-weight:450;background:#1b2226}.numbers button:hover{background:#2d3b43}.extra{margin-top:14px;border-top:1px solid #242c30;padding-top:12px}.extra summary,.terminal-section summary{color:#7d8b92;cursor:pointer;font-size:11px;list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:32px}.extra summary::-webkit-details-marker,.terminal-section summary::-webkit-details-marker{display:none}.extra summary::after,.terminal-section summary::after{content:'+';font-size:17px;color:#71828b}.extra[open] summary::after,.terminal-section[open] summary::after{content:'−'}.extra-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}.extra-grid button{font-size:11px;min-height:38px}.readout{font-size:10px;line-height:1.5;color:#91a1a9;margin:12px 0;min-height:16px;overflow-wrap:anywhere}.terminal-section{border-top:1px solid #242c30;padding-top:4px;margin-top:8px}.terminal-head{display:flex;justify-content:flex-end}.terminal-head button{min-height:28px;padding:3px 8px;font-size:10px;border-radius:7px}.terminal{background:#0a0f12;border:1px solid #26323a;border-radius:9px;padding:8px;height:210px;overflow:auto;font:10px/1.6 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;margin-top:7px;color:#b5c6d0}.log-row{border-bottom:1px solid #172331;padding:4px 0}.log-meta{color:#99c0ab}.log-error{color:#efaaa2}.log-warning{color:#dec58e}.terminal-info{display:block;color:#6f828d;font-size:10px;margin:7px 0;line-height:1.5}footer{display:flex;justify-content:space-between;color:#52636d;font-size:9px;margin-top:14px}.compact-info{color:#71838e;font-size:10px;line-height:1.5;margin:0 0 12px}@media(max-width:340px){body{padding-left:11px;padding-right:11px}.pad{grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,58px)}.sources{gap:5px}.numbers button{height:44px}.context-note{font-size:9px}}@media(prefers-reduced-motion:reduce){button:active{transform:none}}
-.favorites{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.favorite{min-width:0;align-items:stretch;justify-content:flex-start;flex-direction:column;gap:6px;padding:10px;text-align:left;min-height:105px}.favorite-heading{display:flex;align-items:center;gap:7px;color:#a8b9b0;font-size:11px}.favorite-heading b{font-size:17px;font-weight:650;color:#d0e7d7}.program-title{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.program-time{font-size:10px;color:#82958b;margin-top:auto}.epg-status{font-size:9px;color:#81918b;line-height:1.5;margin:8px 0 16px}
-.program-next{font-size:10px;line-height:1.4;color:#8f9eaa;border-top:1px solid #2b3439;padding-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.settings-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:8px;font-size:11px;line-height:1.5;margin:12px 0}.settings-grid dt{color:#84959d}.settings-grid dd{margin:0;overflow-wrap:anywhere}.health-note{color:#91a1a9;font-size:10px;line-height:1.6}.health-actions{display:flex;gap:8px}.health-actions button{font-size:11px;padding:6px 10px;min-height:36px}[data-state="ok"]{color:#b3ddbd}[data-state="error"]{color:#efaaa2}[data-state="unknown"]{color:#dec58e}.sources{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.sources button{min-width:0}.brand-icon{width:24px;height:24px;object-fit:contain}.brand-icon.prime-logo{width:24px}.antenna-tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 0 12px}.antenna-tools button{min-width:0;min-height:44px;font-size:11px;gap:3px;padding:0 3px;white-space:nowrap}.antenna-tools .icon{width:17px;height:17px}.antenna-tools .channel-step{color:#b7c9bb}.antenna-tools .channel-step span{font-size:10px}.sources button .icon{height:24px;width:22px}.search-label{display:block;font-size:11px;color:#b7c9bb;margin-bottom:9px}#youtube-search-form{grid-template-columns:minmax(0,1fr) 64px;margin-bottom:8px}#text-panel{margin-bottom:14px}#youtube-search-form button{background:#c0dfc8;color:#1d3123}#youtube-search-form button:hover{background:#d4ebd9}</style></head><body>
+/* Presentation adapted to the remote: shared source state is owned by the server. */
+:root{color-scheme:dark;--bg:#09090b;--surface:#111113;--surface-2:#18181b;--surface-3:#222226;--line:#1e1e22;--line-2:#2c2c31;--text:#fafafa;--text-2:#d4d4d8;--muted:#a1a1aa;--dim:#71717a;--white:#fafafa;--white-ink:#09090b;--danger:#f87171;--warn:#fbbf24;--ok:#e4e4e7;--r:12px;--r-sm:8px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;background:var(--bg);color:var(--text)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(62px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));-webkit-font-smoothing:antialiased}
+.app{max-width:460px;margin:0 auto}
+button,input,select{font:inherit;color:inherit}
+button{border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);min-height:42px;cursor:pointer;touch-action:manipulation;display:inline-flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s,color .12s,transform .06s}
+button:hover:not(:disabled){background:var(--surface-2);border-color:#3a3a40}
+button:active:not(:disabled){transform:scale(.97);background:var(--surface-3)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible,.terminal:focus-visible{outline:2px solid var(--white);outline-offset:2px}
+button[aria-disabled="true"],button:disabled{opacity:.38;cursor:default}
+[hidden]{display:none!important}
+.icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+
+/* ---- Top Header & 6-Mode Strip ---- */
+.topbar{display:flex;flex-direction:column;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.topbar-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+h1{font-size:19px;letter-spacing:-.5px;margin:0;font-weight:650;color:var(--white)}
+h1 span{color:var(--dim)}
+.sub{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--white);display:inline-block}
+.power-tools{display:inline-flex;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:2px;gap:2px}
+.power-tools button{min-height:30px;height:30px;padding:0 10px;border:0;border-radius:6px;background:transparent;font-size:11.5px;font-weight:550;gap:4px;color:var(--text-2)}
+.power-tools button:hover{background:var(--surface-2);color:var(--white)}
+.power-tools .icon{width:13px;height:13px}
+.power-off{color:var(--muted)!important}
+.power-off:hover{color:var(--danger)!important}
+
+/* 6 Mode Pills: 3x2 on narrow mobile, 6x1 on wider screens */
+.sources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}
+.sources button{min-height:46px;padding:6px 6px;flex-direction:row;gap:6px;font-size:11.5px;font-weight:500;color:var(--muted);background:var(--surface);border-color:var(--line)}
+.sources button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sources button:hover{color:var(--text);border-color:var(--line-2)}
+.sources button.active{color:var(--white-ink)!important;background:var(--white)!important;border-color:var(--white)!important;font-weight:600}
+.sources .icon{width:16px;height:16px}
+.brand-icon{width:16px;height:16px;object-fit:contain;border-radius:3px;flex-shrink:0}
+
+/* Compact Context Bar */
+.meta-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.context{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+.context-title{font-size:12px;font-weight:600;color:var(--text);margin:0;white-space:nowrap}
+.context-note{font-size:11px;color:var(--dim);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.context select{font-size:11.5px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);padding:0 6px;min-height:26px;max-width:140px;margin-left:auto}
+.context select:hover{border-color:var(--line-2);color:var(--text)}
+
+/* Mobile Segmented Switcher (shown ONLY in "Tutti i comandi" when both remote & channels are visible) */
+.mobile-tabs{display:none;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px;margin:10px 0 2px}
+.mobile-tabs button{min-height:32px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:12px;font-weight:550}
+.mobile-tabs button[aria-selected="true"]{background:var(--white);color:var(--white-ink);font-weight:600}
+
+/* ---- Main Workspace ---- */
+.workspace{display:flex;flex-direction:column;gap:0}
+.col-remote,.col-main{display:flex;flex-direction:column}
+.sect{padding:14px 0;border-bottom:1px solid var(--line)}
+.sect-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+h2{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0}
+.compact-info{color:var(--dim);font-size:11.5px;line-height:1.45;margin:6px 0 0}
+
+/* YouTube Search */
+.search-label{display:block;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:0}
+input,select.field-select{width:100%;min-width:0;height:40px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:0 12px;font-size:14px;color:var(--text)}
+input::placeholder{font-size:12.5px;color:var(--dim)}
+form button,.btn-primary{min-height:40px;padding:0 16px;background:var(--white);color:var(--white-ink);border-color:var(--white);font-weight:600;font-size:13px}
+form button:hover:not(:disabled),.btn-primary:hover:not(:disabled){background:#e4e4e7;border-color:#e4e4e7}
+#app-search-unavailable{padding:10px 0;border-bottom:1px solid var(--line);margin:0}
+
+/* Navigation D-Pad */
+.nav-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.pad{display:grid;grid-template-columns:repeat(3,62px);grid-template-rows:repeat(3,62px);gap:6px;width:fit-content;margin:0 auto;padding:10px;border:1px solid var(--line-2);border-radius:26px;background:var(--surface)}
+.pad button{background:var(--surface-2);border:1px solid var(--line-2);border-radius:15px;min-height:0;color:var(--text)}
+.pad button:hover{background:var(--surface-3);border-color:#3f3f46}
+.pad .icon{width:20px;height:20px}
+.pad .center{background:var(--white);color:var(--white-ink);font-size:13.5px;font-weight:700;border-color:var(--white);border-radius:50%}
+.pad .center:hover{background:#e4e4e7}
+.nav-shortcuts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%}
+.nav-shortcuts button{min-height:38px;font-size:12px;color:var(--text-2)}
+
+/* Media & App Volume */
+.media{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.media button{min-height:40px}
+.media .pause{background:var(--white);color:var(--white-ink);border-color:var(--white)}
+.media .pause:hover{background:#e4e4e7}
+.volume-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.volume-row button{min-height:40px;font-weight:550;font-size:12.5px}
+
+/* ---- Channels & Favorites ---- */
+.quick-bar{display:grid;grid-template-columns:1fr;gap:8px;padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.antenna-tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.antenna-tools button{min-width:0;min-height:40px;font-size:12px;gap:4px;padding:0 4px;white-space:nowrap}
+.antenna-tools .channel-step{font-weight:600;color:var(--white)}
+.antenna-tools .channel-step span{font-size:10px;color:var(--muted);font-weight:500}
+.direct-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.numbers{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.numbers button{min-height:34px;height:34px;padding:0;font-size:12.5px;font-weight:550;background:var(--surface);color:var(--text-2)}
+
+.fav-header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+.fav-hint{font-size:11px;color:var(--dim)}
+.favorites{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.favorite-wrap{position:relative;display:flex;min-width:0}
+.favorite{width:100%;min-width:0;align-items:stretch;justify-content:flex-start;flex-direction:column;gap:3px;padding:9px 28px 9px 10px;text-align:left;min-height:76px;background:var(--surface);border:1px solid var(--line-2);border-radius:9px}
+.favorite:hover{background:var(--surface-2);border-color:#3f3f46}
+.favorite-heading{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px;min-width:0}
+.favorite-heading b{font-size:11.5px;font-weight:700;color:var(--white-ink);background:var(--white);min-width:22px;height:19px;padding:0 5px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.favorite-heading span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);font-weight:550}
+.program-title{font-size:12px;font-weight:550;color:var(--text-2);line-height:1.3;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.program-time{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.program-next{font-size:10.5px;line-height:1.3;color:var(--dim);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.program-time:empty,.program-next:empty{display:none}
+.fav-pin{position:absolute;top:5px;right:5px;width:24px;height:24px;min-height:24px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--muted);z-index:2}
+.fav-pin:hover{background:var(--surface-3);color:var(--white)}
+.fav-pin.pinned{color:var(--white)}
+.fav-pin svg{width:13px;height:13px}
+.epg-status{font-size:10.5px;color:var(--dim);line-height:1.45;margin:8px 0 14px}
+
+.dir-controls{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.dir-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cat-pills{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.cat-pills::-webkit-scrollbar{display:none}
+.cat-pills button{min-height:26px;height:26px;padding:0 9px;border-radius:99px;font-size:11px;font-weight:500;background:transparent;border:1px solid var(--line-2);color:var(--muted);white-space:nowrap}
+.cat-pills button[aria-pressed="true"]{background:var(--white);color:var(--white-ink);border-color:var(--white);font-weight:600}
+.dir-filter{height:32px;font-size:12.5px;padding:0 10px;border-radius:6px}
+.channel-dir{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ch-item{position:relative;display:flex;align-items:center}
+.ch-btn{width:100%;min-height:38px;padding:5px 28px 5px 7px;justify-content:flex-start;gap:7px;border-radius:7px;background:var(--surface);border:1px solid var(--line);text-align:left;min-width:0}
+.ch-btn:hover{background:var(--surface-2);border-color:var(--line-2)}
+.ch-num{font-size:11px;font-weight:650;font-variant-numeric:tabular-nums;color:var(--text);background:var(--surface-2);border:1px solid var(--line-2);min-width:26px;height:20px;padding:0 4px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.ch-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.ch-name{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-now{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-now:empty{display:none}
+.ch-star{position:absolute;right:3px;width:24px;height:24px;min-height:24px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--dim)}
+.ch-star:hover{color:var(--white);background:var(--surface-3)}
+.ch-star.pinned{color:var(--white)}
+.ch-star svg{width:12.5px;height:12.5px}
+
+/* ---- Screen Sharing Contextual Mode (#screen-panel) ---- */
+.share-actions-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.share-link-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--surface);color:var(--text);text-decoration:none;font-size:12.5px;font-weight:550}
+.share-link-btn:hover{background:var(--surface-2);border-color:#3f3f46}
+#stop{color:var(--danger)}
+#receiver{overflow-wrap:anywhere;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--text-2)}
+
+/* ---- Expandable Drawers ---- */
+details.drawer{border-bottom:1px solid var(--line)}
+details.drawer summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:42px;padding:0;font-size:12px;font-weight:550;color:var(--muted)}
+details.drawer summary:hover{color:var(--text)}
+details.drawer summary::-webkit-details-marker{display:none}
+details.drawer summary::after{content:'+';font-size:15px;color:var(--dim);font-weight:400}
+details.drawer[open] summary::after{content:'−'}
+.drawer-body{padding:4px 0 14px}
+.extra-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.extra-grid button{font-size:12px;min-height:36px}
+
+/* Status Readout */
+.readout{position:fixed;z-index:20;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));max-width:460px;margin:0 auto;padding:8px 12px;font-size:11.5px;line-height:1.4;color:var(--text-2);background:#111113f2;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line-2);border-radius:8px;min-height:36px;overflow-wrap:anywhere}
+
+/* System Diagnostics & Terminal */
+.settings-grid{display:grid;grid-template-columns:minmax(110px,.85fr) 1.15fr;gap:5px 12px;font-size:11.5px;line-height:1.45;margin:4px 0 12px}
+.settings-grid dt{color:var(--dim)}
+.settings-grid dd{margin:0;overflow-wrap:anywhere;color:var(--text-2)}
+.health-note{color:var(--dim);font-size:11px;line-height:1.5;margin:8px 0}
+.health-actions{display:flex;gap:6px}
+.health-actions button{font-size:11.5px;padding:0 12px;min-height:34px}
+[data-state="ok"]{color:var(--ok)}[data-state="error"]{color:var(--danger)}[data-state="unknown"]{color:var(--warn)}
+.terminal-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.terminal-head button{min-height:28px;padding:0 10px;font-size:11px;border-radius:6px}
+.terminal{background:#050506;border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;height:190px;overflow:auto;font:11px/1.55 ui-monospace,"Cascadia Mono",Consolas,monospace;overflow-wrap:anywhere;margin-top:8px;color:var(--text-2)}
+.log-row{border-bottom:1px solid #16161a;padding:3px 0}
+.log-meta{color:var(--muted)}
+.log-error{color:var(--danger)}.log-warning{color:var(--warn)}
+.terminal-info{display:block;color:var(--dim);font-size:11px;margin:6px 0 0;line-height:1.45}
+footer{display:flex;justify-content:space-between;align-items:center;color:var(--dim);font-size:11px;padding:12px 0 4px}
+
+/* Mobile View Switcher behavior (<960px): active ONLY in 'unknown' (Tutti i comandi) */
+@media(max-width:959px){
+ .workspace[data-source="screen"] .col-main{order:1}
+ .workspace[data-source="screen"] .col-remote{order:2}
+ .workspace.both-active .mobile-tabs{display:grid}
+ .workspace.both-active[data-mobile-pane="remote"] .col-main{display:none!important}
+ .workspace.both-active[data-mobile-pane="channels"] .col-remote{display:none!important}
+ .workspace.no-remote .col-remote{display:none!important}
+ .workspace.no-main .col-main{display:none!important}
+}
+@media(max-width:360px){
+ .pad{grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px)}
+ .sources button{font-size:10.5px;padding:6px 4px}
+}
+
+/* ---- PC & Wide Tablet Layout (>=960px) ---- */
+@media(min-width:960px){
+ body{padding:22px 32px 28px}
+ .app{max-width:1280px}
+ .topbar{flex-direction:row;align-items:center;justify-content:space-between;gap:16px;padding-bottom:14px}
+ .sources{grid-template-columns:repeat(6,minmax(0,auto));width:auto;gap:6px}
+ .sources button{min-height:38px;padding:0 12px;font-size:12px}
+ .meta-bar{padding:10px 0}
+ .context select{margin-left:8px}
+ .readout{position:static;max-width:none;margin:0 0 0 auto;padding:5px 11px;min-height:28px;background:var(--surface);border-radius:6px;font-size:11.5px}
+ .workspace{display:grid;grid-template-columns:360px minmax(0,1fr);gap:36px;align-items:start;padding-top:6px}
+ .workspace.no-remote{grid-template-columns:minmax(0,1fr)}
+ .workspace.no-remote .col-remote{display:none}
+ .workspace.no-main{grid-template-columns:minmax(360px,440px);justify-content:center}
+ .workspace.no-main .col-main{display:none}
+ .col-remote{position:sticky;top:20px;border:1px solid var(--line);border-radius:14px;padding:2px 18px 6px;background:var(--surface)}
+ .col-remote .sect:last-child,details.drawer:last-child{border-bottom:0}
+ .col-remote .pad button:not(.center){background:var(--bg)}
+ .col-remote input,.col-remote .nav-shortcuts button,.col-remote .media button:not(.pause),.col-remote .volume-row button,.col-remote .extra-grid button{background:var(--bg)}
+ .direct-row{grid-template-columns:210px minmax(0,1fr);align-items:center}
+ .favorites{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .channel-dir{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+ .dir-controls{flex-direction:row;align-items:center;justify-content:space-between}
+ .dir-filter{width:210px}
+ .system-bar{display:grid;grid-template-columns:1fr 1fr;gap:24px;border-top:1px solid var(--line);margin-top:8px;padding-top:4px}
+ .system-bar details.drawer{border-bottom:0}
+}
+@media(min-width:1240px){
+ .workspace{grid-template-columns:370px minmax(0,1fr);gap:42px}
+ .channel-dir{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:active{transform:none}}
+</style></head><body>
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg"><defs>
 <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9m-5.5-7a8 8 0 1 0 11 0"/></symbol>
 <symbol id="i-pc" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></symbol>
 <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="13" rx="3"/><path d="M8 21h8m-4-3v3"/></symbol>
+<symbol id="i-cast" viewBox="0 0 24 24"><path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><line x1="2" y1="20" x2="2.01" y2="20"/></symbol>
 <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol><symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol><symbol id="i-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol><symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
 <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8M5 10v10h5v-6h4v6h5V10"/></symbol>
 <symbol id="i-back" viewBox="0 0 24 24"><path d="m9 5-6 6 6 6m-6-6h12a6 6 0 0 1 0 12"/></symbol>
@@ -16,13 +237,43 @@
 <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8Z"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></symbol>
 <symbol id="i-rewind" viewBox="0 0 24 24"><path d="m12 5-9 7 9 7Zm9 0-9 7 9 7Z"/></symbol><symbol id="i-forward" viewBox="0 0 24 24"><path d="m3 5 9 7-9 7Zm9 0 9 7-9 7Z"/></symbol>
 <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9Zm13-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol><symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9Zm13 0 5 6m0-6-5 6"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></symbol>
+<symbol id="i-star-fill" viewBox="0 0 24 24"><path fill="currentColor" d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></symbol>
 </defs></svg>
-<main>
-<header><div><h1>Salotto<span style="color:#a8cbb2">.</span></h1><div class="sub"><span class="dot" aria-hidden="true"></span><span id="connection">Locale</span></div></div><div class="power-tools"><button class="power-on" data-power="on" aria-label="Accendi TV" title="Accendi"><svg class="icon"><use href="#i-power"/></svg><span>On</span></button><button class="power-off" data-power="off" aria-label="Spegni TV" title="Spegni"><svg class="icon"><use href="#i-power"/></svg><span>Off</span></button></div></header>
-<nav class="sources" aria-label="Apri una sorgente sulla TV"><button data-key="KEY_TV" data-source="tv" aria-label="Apri TV antenna"><svg class="icon"><use href="#i-tv"/></svg><span>TV</span></button><button data-app="youtube" data-source="youtube" aria-label="Apri YouTube"><img class="brand-icon" src="/assets/youtube.png" alt="" width="24" height="24"><span>YouTube</span></button><button data-app="netflix" data-source="netflix" aria-label="Apri Netflix"><img class="brand-icon" src="/assets/netflix.png" alt="" width="24" height="24"><span>Netflix</span></button><button data-app="primevideo" data-source="primevideo" aria-label="Apri Prime Video"><img class="brand-icon prime-logo" src="/assets/primevideo.png" alt="" width="24" height="24"><span>Prime Video</span></button><button data-input="pc" data-source="pc" aria-label="Apri PC su HDMI 1" title="PC · HDMI 1"><svg class="icon"><use href="#i-pc"/></svg><span>PC</span></button></nav>
-<div style="display:flex;gap:10px;align-items:center;margin:0 0 14px"><button type="button" data-screen="open" data-source="screen" style="padding:8px 12px">Apri schermo sulla TV</button><a href="__SHARE_URL__" style="color:#c0dfc8;font-size:11px">Condividi dal PC</a></div>
-<div class="context"><p class="context-title" id="view-title">Comandi</p><label class="sr-only" for="view-select">Vista del telecomando, non cambia la sorgente TV</label><select id="view-select" title="Adatta solo la vista"><option value="unknown">Tutti i comandi</option><option value="tv">TV · canali</option><option value="youtube">YouTube</option><option value="netflix">Netflix</option><option value="primevideo">Prime Video</option><option value="pc">PC · HDMI 1</option><option value="screen">Schermo PC · rete</option></select></div><p id="context-note" class="context-note">Vista presunta, correggibile dal selettore.</p>
-<section id="text-panel" class="panel" aria-label="Ricerca YouTube">
+<div class="app">
+<header class="topbar">
+<div class="topbar-row">
+<div class="brand"><h1>Salotto<span>.</span></h1><div class="sub"><span class="dot" aria-hidden="true"></span><span id="connection">Locale</span></div></div>
+<div class="power-tools"><button class="power-on" data-power="on" aria-label="Accendi TV" title="Accendi (Wake-on-LAN)"><svg class="icon"><use href="#i-power"/></svg><span>On</span></button><button class="power-off" data-power="off" aria-label="Spegni TV" title="Spegni (standby)"><svg class="icon"><use href="#i-power"/></svg><span>Off</span></button></div>
+</div>
+<nav class="sources" aria-label="Modalità e sorgenti TV">
+<button data-key="KEY_TV" data-source="tv" aria-label="Apri TV antenna"><svg class="icon"><use href="#i-tv"/></svg><span>TV</span></button>
+<button data-app="youtube" data-source="youtube" aria-label="Apri YouTube"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" fill="#ff0033" stroke="none"/><path d="m10 9 6 3-6 3Z" fill="#fff" stroke="none"/></svg><span>YouTube</span></button>
+<button data-app="netflix" data-source="netflix" aria-label="Apri Netflix"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="#e50914" stroke="none"/><path d="M8 6h2.6l5.4 12H13.4L8 6Zm0 0h2.4v12H8V6Zm5.6 0H16v12h-2.4V6Z" fill="#fff" stroke="none"/></svg><span>Netflix</span></button>
+<button data-app="primevideo" data-source="primevideo" aria-label="Apri Prime Video"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4" fill="#00a8e1" stroke="none"/><path d="M6.5 14.2c3.2 2.2 7.8 2.2 11 0m-.6-1.2 1.4.6-.4 1.5" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Prime Video</span></button>
+<button data-input="pc" data-source="pc" aria-label="Apri PC su HDMI 1" title="PC · HDMI 1"><svg class="icon"><use href="#i-pc"/></svg><span>PC · HDMI</span></button>
+<button type="button" data-screen="open" data-source="screen" aria-label="Apri schermo sulla TV" title="Condividi schermo PC"><svg class="icon"><use href="#i-cast"/></svg><span>Condividi</span></button>
+</nav>
+</header>
+
+<div class="meta-bar">
+<div class="context">
+<p class="context-title" id="view-title">Comandi</p>
+<p id="context-note" class="context-note">Vista presunta, correggibile dal selettore.</p>
+<label class="sr-only" for="view-select">Vista del telecomando, non cambia la sorgente TV</label>
+<select id="view-select" title="Adatta solo la vista"><option value="tv">TV · canali</option><option value="youtube">YouTube</option><option value="netflix">Netflix</option><option value="primevideo">Prime Video</option><option value="pc">PC · HDMI 1</option><option value="screen">Schermo PC · rete</option><option value="unknown">Tutti i comandi</option></select>
+</div>
+<div class="readout" role="status" aria-live="polite" id="status">Pronto.</div>
+</div>
+
+<main class="workspace both-active" id="workspace" data-mobile-pane="channels">
+<div class="mobile-tabs" role="tablist" aria-label="Sezione in vista completa">
+<button type="button" role="tab" data-pane-tab="channels" aria-selected="true">Canali e guida</button>
+<button type="button" role="tab" data-pane-tab="remote" aria-selected="false">Telecomando</button>
+</div>
+
+<div class="col-remote">
+<section id="text-panel" class="sect" aria-label="Ricerca YouTube">
 <label for="youtube-query" class="search-label">Cerca su YouTube</label>
 <form id="youtube-search-form" role="search" autocomplete="off">
 <input id="youtube-query" type="search" maxlength="128" placeholder="Cerca un video sulla TV" aria-label="Cerca un video sulla TV" aria-describedby="youtube-search-note" enterkeyhint="search" required>
@@ -30,14 +281,77 @@
 </form>
 <p id="youtube-search-note" class="compact-info">Scrivi con la tastiera del dispositivo e premi Cerca. I risultati si aprono nell’app YouTube sulla TV.</p>
 </section>
-<section id="navigation-panel" aria-label="Navigazione app" class="panel">
-<div class="pad"><span></span><button data-key="KEY_UP" aria-label="Su"><svg class="icon"><use href="#i-up"/></svg></button><span></span><button data-key="KEY_LEFT" aria-label="Sinistra"><svg class="icon"><use href="#i-left"/></svg></button><button class="center" data-key="KEY_ENTER" aria-label="OK">OK</button><button data-key="KEY_RIGHT" aria-label="Destra"><svg class="icon"><use href="#i-right"/></svg></button><span></span><button data-key="KEY_DOWN" aria-label="Giù"><svg class="icon"><use href="#i-down"/></svg></button><span></span></div>
-<div class="nav-shortcuts"><button data-key="KEY_RETURN" aria-label="Indietro" title="Indietro"><svg class="icon"><use href="#i-back"/></svg></button><button data-key="KEY_HOME" aria-label="Home" title="Home"><svg class="icon"><use href="#i-home"/></svg></button><button data-key="KEY_EXIT" aria-label="Esci" title="Esci"><svg class="icon"><use href="#i-exit"/></svg></button></div></section>
-<section id="channels-panel" class="panel" aria-label="Canali TV"><h2>Preferiti · in onda</h2><div id="favorites" class="favorites" aria-label="Canali preferiti"></div><p id="epg-status" class="epg-status">Caricamento guida TV…</p><h2>Canali</h2><div class="antenna-tools" role="group" aria-label="Volume e canali antenna"><button data-volume="-2" aria-label="Abbassa volume di 2" title="Volume −2"><span aria-hidden="true">−2</span><svg class="icon"><use href="#i-volume"/></svg></button><button data-key="KEY_MUTE" aria-label="Muto" title="Muto"><svg class="icon"><use href="#i-mute"/></svg></button><button data-volume="2" aria-label="Alza volume di 2" title="Volume +2"><svg class="icon"><use href="#i-volume"/></svg><span aria-hidden="true">+2</span></button><button class="channel-step" data-key="KEY_CHDOWN" aria-label="Canale precedente" title="Canale −"><span>CH</span> −</button><button class="channel-step" data-key="KEY_CHUP" aria-label="Canale successivo" title="Canale +"><span>CH</span> +</button></div><form id="channel-form"><label class="sr-only" for="channel">Numero del canale</label><input id="channel" aria-label="Numero del canale" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4" placeholder="Canale, es. 20 o 501" required><button type="submit" aria-label="Vai al canale" title="Vai">Vai</button></form><div class="numbers" id="digits"></div></section>
-<section id="media-panel" aria-label="Riproduzione"><div class="media"><button data-key="KEY_REWIND" aria-label="Indietro veloce" title="Indietro veloce"><svg class="icon"><use href="#i-rewind"/></svg></button><button class="pause" data-key="KEY_PAUSE" aria-label="Pausa" title="Pausa"><svg class="icon"><use href="#i-pause"/></svg></button><button data-key="KEY_PLAY" aria-label="Riprendi" title="Riprendi"><svg class="icon"><use href="#i-play"/></svg></button><button data-key="KEY_FF" aria-label="Avanti veloce" title="Avanti veloce"><svg class="icon"><use href="#i-forward"/></svg></button></div></section>
-<section id="app-volume" class="volume" aria-label="Volume"><button data-volume="-2" aria-label="Abbassa volume di 2"><span aria-hidden="true">−</span><svg class="icon"><use href="#i-volume"/></svg></button><button data-key="KEY_MUTE" aria-label="Muto" title="Muto"><svg class="icon"><use href="#i-mute"/></svg></button><button data-volume="2" aria-label="Alza volume di 2"><svg class="icon"><use href="#i-volume"/></svg><span aria-hidden="true">+</span></button></section>
-<details class="extra" id="other-controls"><summary>Altri comandi</summary><div class="extra-grid"><button data-key="KEY_MENU">Menu</button><button data-key="KEY_SOURCE">Sorgenti</button><button data-key="KEY_GUIDE">Guida</button><button data-key="KEY_INFO">Info</button><button data-key="KEY_CH_LIST">Lista canali</button><button data-key="KEY_STOP">Stop</button><button data-key="KEY_CHDOWN">Canale −</button><button data-key="KEY_CHUP">Canale +</button><button data-key="KEY_HOME">Home</button></div><p class="compact-info">Per navigare nei menu mentre guardi i canali, seleziona «Tutti i comandi».</p></details>
-<details class="extra" id="settings"><summary>Impostazioni · Raspberry e server</summary>
+<p id="app-search-unavailable" class="compact-info" hidden>Su questa TV la ricerca da PC o smartphone è disponibile solo per YouTube. Per questa app usa la ricerca sulla TV.</p>
+
+<section id="navigation-panel" aria-label="Navigazione app" class="sect">
+<div class="sect-head"><h2>Navigazione</h2></div>
+<div class="nav-wrap">
+<div class="pad"><span></span><button data-key="KEY_UP" aria-label="Su" title="Su"><svg class="icon"><use href="#i-up"/></svg></button><span></span><button data-key="KEY_LEFT" aria-label="Sinistra" title="Sinistra"><svg class="icon"><use href="#i-left"/></svg></button><button class="center" data-key="KEY_ENTER" aria-label="OK">OK</button><button data-key="KEY_RIGHT" aria-label="Destra" title="Destra"><svg class="icon"><use href="#i-right"/></svg></button><span></span><button data-key="KEY_DOWN" aria-label="Giù" title="Giù"><svg class="icon"><use href="#i-down"/></svg></button><span></span></div>
+<div class="nav-shortcuts"><button data-key="KEY_RETURN" aria-label="Indietro" title="Indietro"><svg class="icon"><use href="#i-back"/></svg><span>Indietro</span></button><button data-key="KEY_HOME" aria-label="Home" title="Home"><svg class="icon"><use href="#i-home"/></svg><span>Home</span></button><button data-key="KEY_EXIT" aria-label="Esci" title="Esci"><svg class="icon"><use href="#i-exit"/></svg><span>Esci</span></button></div>
+</div>
+</section>
+
+<section id="media-panel" class="sect" aria-label="Riproduzione">
+<div class="sect-head"><h2>Riproduzione</h2></div>
+<div class="media"><button data-key="KEY_REWIND" aria-label="Indietro veloce" title="Indietro veloce"><svg class="icon"><use href="#i-rewind"/></svg></button><button class="pause" data-key="KEY_PAUSE" aria-label="Pausa" title="Pausa"><svg class="icon"><use href="#i-pause"/></svg></button><button data-key="KEY_PLAY" aria-label="Riprendi" title="Riprendi"><svg class="icon"><use href="#i-play"/></svg></button><button data-key="KEY_FF" aria-label="Avanti veloce" title="Avanti veloce"><svg class="icon"><use href="#i-forward"/></svg></button></div>
+</section>
+
+<section id="app-volume" class="sect volume" aria-label="Volume">
+<div class="sect-head"><h2>Volume</h2></div>
+<div class="volume-row"><button data-volume="-2" aria-label="Abbassa volume di 2" title="Volume −2"><svg class="icon"><use href="#i-volume"/></svg><span aria-hidden="true">−2</span></button><button data-key="KEY_MUTE" aria-label="Muto" title="Muto"><svg class="icon"><use href="#i-mute"/></svg></button><button data-volume="2" aria-label="Alza volume di 2" title="Volume +2"><svg class="icon"><use href="#i-volume"/></svg><span aria-hidden="true">+2</span></button></div>
+</section>
+
+<details class="drawer extra" id="other-controls"><summary>Altri comandi</summary><div class="drawer-body"><div class="extra-grid"><button data-key="KEY_MENU">Menu</button><button data-key="KEY_SOURCE">Sorgenti</button><button data-key="KEY_GUIDE">Guida</button><button data-key="KEY_INFO">Info</button><button data-key="KEY_CH_LIST">Lista canali</button><button data-key="KEY_STOP">Stop</button><button data-key="KEY_CHDOWN">Canale −</button><button data-key="KEY_CHUP">Canale +</button><button data-key="KEY_HOME">Home</button></div><p class="compact-info">Per navigare nei menu mentre guardi i canali, seleziona «Tutti i comandi».</p></div></details>
+</div>
+
+<div class="col-main">
+<section id="channels-panel" class="sect" aria-label="Canali TV">
+<div class="quick-bar">
+<div class="antenna-tools" role="group" aria-label="Volume e canali antenna"><button data-volume="-2" aria-label="Abbassa volume di 2" title="Volume −2"><span aria-hidden="true">−2</span><svg class="icon"><use href="#i-volume"/></svg></button><button data-key="KEY_MUTE" aria-label="Muto" title="Muto"><svg class="icon"><use href="#i-mute"/></svg></button><button data-volume="2" aria-label="Alza volume di 2" title="Volume +2"><svg class="icon"><use href="#i-volume"/></svg><span aria-hidden="true">+2</span></button><button class="channel-step" data-key="KEY_CHDOWN" aria-label="Canale precedente" title="Canale −"><span>CH</span> −</button><button class="channel-step" data-key="KEY_CHUP" aria-label="Canale successivo" title="Canale +"><span>CH</span> +</button></div>
+<div class="direct-row">
+<form id="channel-form"><label class="sr-only" for="channel">Numero del canale</label><input id="channel" aria-label="Numero del canale" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4" placeholder="N° canale (es. 20 o 501)" required><button type="submit" aria-label="Vai al canale" title="Vai">Vai</button></form>
+<div class="numbers" id="digits" aria-label="Canali rapidi 1–9"></div>
+</div>
+</div>
+
+<div class="fav-header">
+<h2>Preferiti · in onda</h2>
+<span class="fav-hint">Tocca ★ sui canali per personalizzare</span>
+</div>
+<div id="favorites" class="favorites" aria-label="Canali preferiti"></div>
+<p id="epg-status" class="epg-status">Caricamento guida TV…</p>
+
+<div class="dir-controls">
+<div class="dir-top">
+<h2>Tutti i canali</h2>
+<div class="cat-pills" role="group" aria-label="Filtra per categoria">
+<button type="button" data-cat="all" aria-pressed="true">Tutti</button>
+<button type="button" data-cat="generalisti" aria-pressed="false">Generalisti</button>
+<button type="button" data-cat="cinema" aria-pressed="false">Cinema e serie</button>
+<button type="button" data-cat="intrattenimento" aria-pressed="false">Intrattenimento</button>
+<button type="button" data-cat="info" aria-pressed="false">News e sport</button>
+<button type="button" data-cat="ragazzi" aria-pressed="false">Ragazzi</button>
+</div>
+</div>
+<input type="search" id="channel-search" class="dir-filter" placeholder="Filtra per nome o numero…" aria-label="Filtra canali per nome o numero" autocomplete="off">
+</div>
+<div id="channel-directory" class="channel-dir" aria-label="Elenco canali del digitale terrestre"></div>
+</section>
+
+<section id="screen-panel" class="sect" aria-label="Condivisione schermo PC" hidden>
+<div class="sect-head"><h2>Condividi lo schermo</h2></div>
+<p class="compact-info">Dal browser del PC puoi condividere uno schermo, una finestra o una scheda. La cattura si avvia dalla pagina dedicata, con le impostazioni video, audio e l’anteprima.</p>
+<div class="share-actions-row">
+<button type="button" class="btn-primary" data-screen="open">Apri schermo sulla TV</button>
+<a class="share-link-btn" href="__SHARE_URL__">Condividi dal PC →</a>
+</div>
+<p class="compact-info">Da smartphone puoi aprire il ricevitore sulla TV e usare il telecomando. La cattura richiede il browser di un PC.</p>
+</section>
+</div>
+</main>
+
+<div class="system-bar">
+<details class="drawer extra" id="settings"><summary>Impostazioni · Raspberry e server</summary><div class="drawer-body">
 <dl class="settings-grid" aria-live="polite">
 <dt id="host-label">Dispositivo server</dt><dd id="host-health">Verifica in corso…</dd>
 <dt>Applicativo server</dt><dd id="server-health">Verifica in corso…</dd>
@@ -54,10 +368,11 @@
 </dl>
 <p id="health-note" class="health-note">La risposta del server conferma che il dispositivo è online. Se manca, il browser non può distinguere un Raspberry spento da un problema di rete o del servizio.</p>
 <div class="health-actions"><button type="button" id="check-health">Verifica ora</button><button type="button" id="reload-page">Ricarica pagina</button></div>
-<p class="health-note">IP stabile: prenotazione DHCP sul router per il Raspberry. Avvio al boot e refresh sono gestiti dal servizio di sistema, senza login manuale. Il collegamento TV può essere chiuso quando non invii comandi.</p></details>
-<div class="readout" role="status" aria-live="polite" id="status">Pronto.</div>
-<details class="terminal-section"><summary>Terminale comandi</summary><div class="terminal-head"><button type="button" id="copy-log">Copia log</button></div><small class="terminal-info">Browser → Server → TV · ultima sessione · 200 righe</small><div id="command-log" class="terminal" role="region" aria-label="Log dei comandi" tabindex="0"></div><small id="log-health" class="terminal-info">Connessione al log…</small></details><footer><span>Solo rete locale</span><span>Samsung KS7000</span></footer>
-</main>
+<p class="health-note">IP stabile: prenotazione DHCP sul router per il Raspberry. Avvio al boot e refresh sono gestiti dal servizio di sistema, senza login manuale. Il collegamento TV può essere chiuso quando non invii comandi.</p></div></details>
+<details class="drawer terminal-section"><summary>Terminale comandi</summary><div class="drawer-body"><div class="terminal-head"><small class="terminal-info" style="margin:0">Browser → Server → TV · ultima sessione · 200 righe</small><button type="button" id="copy-log">Copia log</button></div><div id="command-log" class="terminal" role="region" aria-label="Log dei comandi" tabindex="0"></div><small id="log-health" class="terminal-info">Connessione al log…</small></div></details>
+</div>
+<footer><span>Solo rete locale</span><span>Samsung KS7000</span></footer>
+</div>
 <script nonce="__CSRF__">
 const controlKey='__CSRF__';let pending=false,lastRevision=null;
 const status=document.querySelector('#status'),viewSelect=document.querySelector('#view-select');
@@ -65,19 +380,108 @@ const names={unknown:'completa',tv:'TV',youtube:'YouTube',netflix:'Netflix',prim
 const logBox=document.querySelector('#command-log'),logHealth=document.querySelector('#log-health');
 let logCursor=0,logEpoch='',logFetching=false,logOffline=false;
 const logRows=[];
-const favoriteChannels=[['5','Canale 5'],['6','Italia 1'],['8','TV8'],['9','NOVE'],['20','20 Mediaset'],['52','DMAX']];
+const defaultFavorites=['5','6','8','9','20','52'];
+const epgSupported=new Set(defaultFavorites);
+const allChannels=[
+ ['1','Rai 1','generalisti'],['2','Rai 2','generalisti'],['3','Rai 3','generalisti'],
+ ['4','Rete 4','generalisti'],['5','Canale 5','generalisti'],['6','Italia 1','generalisti'],
+ ['7','La7','generalisti'],['8','TV8','generalisti'],['9','NOVE','generalisti'],
+ ['20','20 Mediaset','cinema'],['21','Rai 4','cinema'],['22','Iris','cinema'],
+ ['23','Rai 5','intrattenimento'],['24','Rai Movie','cinema'],['25','Rai Premium','cinema'],
+ ['26','Cielo','intrattenimento'],['27','Twentyseven','cinema'],['28','TV2000','generalisti'],
+ ['29','La7d','intrattenimento'],['30','La5','intrattenimento'],['31','Real Time','intrattenimento'],
+ ['33','Food Network','intrattenimento'],['34','Cine34','cinema'],['35','Focus','intrattenimento'],
+ ['36','RTL 102.5','intrattenimento'],['37','Warner TV','cinema'],['38','Giallo','cinema'],
+ ['39','Top Crime','cinema'],['40','Boing','ragazzi'],['41','K2','ragazzi'],
+ ['42','Rai Gulp','ragazzi'],['43','Rai Yoyo','ragazzi'],['44','Frisbee','ragazzi'],
+ ['46','Cartoonito','ragazzi'],['47','Super!','ragazzi'],['48','Rai News 24','info'],
+ ['49','Mediaset Italia 2','cinema'],['50','Sky TG24','info'],['51','TGCOM24','info'],
+ ['52','DMAX','intrattenimento'],['54','Rai Storia','intrattenimento'],['56','HGTV','intrattenimento'],
+ ['58','Rai Sport','info'],['60','Sportitalia','info'],['67','R101 TV','intrattenimento']
+];
+const channelNames=new Map(allChannels.map(([n,nm])=>[n,nm]));
+let pinnedFavorites=[...defaultFavorites];
+try{
+ const saved=JSON.parse(localStorage.getItem('salotto_favorites')||'null');
+ if(Array.isArray(saved)&&saved.length){pinnedFavorites=[...new Set(saved.map(String).filter(n=>channelNames.has(n)))];if(!pinnedFavorites.length)pinnedFavorites=[...defaultFavorites]}
+}catch{}
+function saveFavorites(){try{localStorage.setItem('salotto_favorites',JSON.stringify(pinnedFavorites))}catch{}}
 const favoriteCards=new Map();
-for(const [number,name] of favoriteChannels){
- const button=document.createElement('button');button.dataset.channel=number;button.className='favorite';
- const heading=document.createElement('span');heading.className='favorite-heading';
- const digit=document.createElement('b');digit.textContent=number;
- const label=document.createElement('span');label.textContent=name;heading.append(digit,label);
- const title=document.createElement('span');title.className='program-title';title.textContent='Guida in caricamento…';
- const time=document.createElement('span');time.className='program-time';
- const next=document.createElement('span');next.className='program-next';next.textContent='';
- button.append(heading,title,time,next);button.setAttribute('aria-label','Canale '+number+' · '+name);
- document.querySelector('#favorites').append(button);favoriteCards.set(number,{button,title,time,next});
+const directoryItems=new Map();
+const lastEpgByChannel=new Map();
+let activeCat='all',channelFilter='';
+
+function applyCardEpg(number,card){
+ const ch=lastEpgByChannel.get(number);
+ const name=channelNames.get(number)||('Canale '+number);
+ if(ch){
+  card.title.textContent=ch.current?.title||'Programma non disponibile';
+  card.time.textContent=ch.current?guideTime(ch.current.start)+' – '+guideTime(ch.current.end):ch.next?'Dalle '+guideTime(ch.next.start):'Orari non disponibili';
+  card.next.textContent=ch.next?'Poi '+guideTime(ch.next.start)+' · '+ch.next.title:'Prossimo programma non disponibile';
+  card.button.setAttribute('aria-label','Canale '+number+' · '+name+' · '+card.title.textContent+' · '+card.next.textContent);
+  card.button.title=(ch.current?.title||name)+'\n'+card.next.textContent;
+ }else if(epgSupported.has(number)){
+  card.title.textContent='Guida in caricamento…';card.time.textContent='';card.next.textContent='';
+  card.button.setAttribute('aria-label','Canale '+number+' · '+name);
+ }else{
+  card.title.textContent='Accesso diretto al canale';card.time.textContent='Canale '+number;card.next.textContent='';
+  card.button.setAttribute('aria-label','Canale '+number+' · '+name);
+ }
 }
+
+function renderFavorites(){
+ const box=document.querySelector('#favorites');box.textContent='';favoriteCards.clear();
+ for(const number of pinnedFavorites){
+  const name=channelNames.get(number)||('Canale '+number);
+  const wrap=document.createElement('div');wrap.className='favorite-wrap';
+  const button=document.createElement('button');button.type='button';button.dataset.channel=number;button.className='favorite';
+  const heading=document.createElement('span');heading.className='favorite-heading';
+  const digit=document.createElement('b');digit.textContent=number;
+  const label=document.createElement('span');label.textContent=name;heading.append(digit,label);
+  const title=document.createElement('span');title.className='program-title';
+  const time=document.createElement('span');time.className='program-time';
+  const next=document.createElement('span');next.className='program-next';
+  button.append(heading,title,time,next);
+  const pin=document.createElement('button');pin.type='button';pin.className='fav-pin pinned';pin.dataset.favToggle=number;
+  pin.setAttribute('aria-label','Rimuovi '+name+' dai preferiti');pin.title='Rimuovi dai preferiti';
+  pin.innerHTML='<svg class="icon"><use href="#i-star-fill"/></svg>';
+  wrap.append(button,pin);box.append(wrap);
+  const card={button,title,time,next};favoriteCards.set(number,card);applyCardEpg(number,card);
+ }
+}
+
+function renderDirectory(){
+ const dir=document.querySelector('#channel-directory');dir.textContent='';directoryItems.clear();
+ const q=channelFilter.trim().toLowerCase();
+ for(const [number,name,cat] of allChannels){
+  if(activeCat!=='all'&&cat!==activeCat)continue;
+  if(q&&!number.includes(q)&&!name.toLowerCase().includes(q))continue;
+  const item=document.createElement('div');item.className='ch-item';
+  const btn=document.createElement('button');btn.type='button';btn.className='ch-btn';btn.dataset.channel=number;
+  btn.setAttribute('aria-label','Canale '+number+' · '+name);
+  const num=document.createElement('span');num.className='ch-num';num.textContent=number;
+  const meta=document.createElement('span');meta.className='ch-meta';
+  const nm=document.createElement('span');nm.className='ch-name';nm.textContent=name;
+  const now=document.createElement('span');now.className='ch-now';
+  const epg=lastEpgByChannel.get(number);if(epg?.current?.title)now.textContent=epg.current.title;
+  meta.append(nm,now);btn.append(num,meta);
+  const isPinned=pinnedFavorites.includes(number);
+  const star=document.createElement('button');star.type='button';star.className='ch-star'+(isPinned?' pinned':'');star.dataset.favToggle=number;
+  star.setAttribute('aria-label',(isPinned?'Rimuovi ':'Aggiungi ')+name+(isPinned?' dai preferiti':' ai preferiti'));
+  star.setAttribute('aria-pressed',String(isPinned));
+  star.title=isPinned?'Nei preferiti (clicca per rimuovere)':'Aggiungi ai preferiti';
+  star.innerHTML='<svg class="icon"><use href="#'+(isPinned?'i-star-fill':'i-star')+'"/></svg>';
+  item.append(btn,star);dir.append(item);directoryItems.set(number,{btn,now,star});
+ }
+}
+
+function toggleFavorite(number){
+ const idx=pinnedFavorites.indexOf(number);
+ if(idx>=0){if(pinnedFavorites.length<=1)return;pinnedFavorites.splice(idx,1)}
+ else{pinnedFavorites.push(number);pinnedFavorites.sort((a,b)=>Number(a)-Number(b))}
+ saveFavorites();renderFavorites();renderDirectory();
+}
+renderFavorites();renderDirectory();
 let guideFetching=false;
 const guideDateTime=timestamp=>new Date(timestamp*1000).toLocaleString('it-IT',{timeZone:'Europe/Rome',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const guideTime=timestamp=>new Date(timestamp*1000).toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit'});
@@ -88,7 +492,9 @@ async function refreshGuide(){
   if(!response.ok)throw Error('HTTP '+response.status);
   const data=await response.json();
   for(const channel of data.channels){
-   const card=favoriteCards.get(channel.number);if(!card)continue;
+   lastEpgByChannel.set(String(channel.number),channel);
+   const dirEntry=directoryItems.get(String(channel.number));if(dirEntry)dirEntry.now.textContent=channel.current?.title||'';
+   const card=favoriteCards.get(String(channel.number));if(!card)continue;
    card.title.textContent=channel.current?.title||'Programma non disponibile';
    card.time.textContent=channel.current?guideTime(channel.current.start)+' – '+guideTime(channel.current.end):channel.next?'Dalle '+guideTime(channel.next.start):'Orari non disponibili';
    card.next.textContent=channel.next?'Poi '+guideTime(channel.next.start)+' · '+channel.next.title:'Prossimo programma non disponibile';
@@ -127,7 +533,34 @@ async function readLogs(){
  finally{logFetching=false}
 }
 for(const n of [1,2,3,4,5,6,7,8,9]){const b=document.createElement('button');b.textContent=n;b.dataset.channel=String(n);b.setAttribute('aria-label','Canale '+n);document.querySelector('#digits').append(b)}
-function renderContext(c){if(!c)return;const source=Object.hasOwn(names,c.source)?c.source:'unknown';if(c.revision===lastRevision&&viewSelect.value===source)return;lastRevision=c.revision;viewSelect.value=source;document.querySelector('#view-title').textContent=source==='unknown'?'Tutti i comandi':'Comandi · '+names[source];document.querySelector('#text-panel').hidden=['tv','pc','screen'].includes(source);document.querySelector('#channels-panel').hidden=!['unknown','tv'].includes(source);document.querySelector('#media-panel').hidden=['tv','pc','screen'].includes(source);document.querySelector('#navigation-panel').hidden=['tv','pc'].includes(source);document.querySelector('#app-volume').hidden=['tv','unknown'].includes(source);document.querySelectorAll('[data-source]').forEach(b=>{b.classList.toggle('active',b.dataset.source===source);if(b.dataset.source===source)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});const reason={unknown:'Sorgente non rilevata · scegli una vista',manual:'Vista manuale · sorgente non verificata',last_request:'Da ultimo comando · sorgente non verificata',restored:'Vista salvata · sorgente non verificata',unconfirmed:'Sorgente incerta · tutti i comandi',power_request:'Sorgente non rilevata dopo Power',power_on_default:'Accensione richiesta · vista antenna predefinita'};document.querySelector('#context-note').textContent=(reason[c.basis]||reason.unknown)+(c.channel_requested?' · canale richiesto '+c.channel_requested:'')+(c.persisted===false&&c.revision>0?' · memoria temporanea':'')}
+function renderContext(context){
+ if(!context)return;
+ const source=Object.hasOwn(names,context.source)?context.source:'unknown';
+ if(context.revision===lastRevision&&viewSelect.value===source)return;
+ lastRevision=context.revision;viewSelect.value=source;
+ document.querySelector('#view-title').textContent=source==='unknown'?'Tutti i comandi':'Comandi · '+names[source];
+ document.querySelector('#text-panel').hidden=!['unknown','youtube'].includes(source);
+ document.querySelector('#app-search-unavailable').hidden=!['netflix','primevideo'].includes(source);
+ document.querySelector('#channels-panel').hidden=!['unknown','tv'].includes(source);
+ document.querySelector('#media-panel').hidden=['tv','pc','screen'].includes(source);
+ document.querySelector('#navigation-panel').hidden=['tv','pc'].includes(source);
+ document.querySelector('#app-volume').hidden=['tv','unknown'].includes(source);
+ document.querySelector('#screen-panel').hidden=!['screen','unknown'].includes(source);
+ const workspace=document.querySelector('#workspace');
+ workspace.dataset.source=source;
+ workspace.classList.toggle('both-active',source==='unknown');
+ workspace.classList.toggle('no-remote',source==='tv');
+ workspace.classList.toggle('no-main',!['unknown','tv','screen'].includes(source));
+ document.querySelectorAll('[data-source]').forEach(button=>{
+  button.classList.toggle('active',button.dataset.source===source);
+  if(button.dataset.source===source)button.setAttribute('aria-current','true');
+  else button.removeAttribute('aria-current');
+ });
+ const reasons={unknown:'Sorgente non rilevata · scegli una vista',manual:'Vista manuale · sorgente non verificata',last_request:'Da ultimo comando · sorgente non verificata',restored:'Vista salvata · sorgente non verificata',unconfirmed:'Sorgente incerta · tutti i comandi',power_request:'Sorgente non rilevata dopo Power',power_on_default:'Accensione richiesta · vista antenna predefinita'};
+ document.querySelector('#context-note').textContent=(reasons[context.basis]||reasons.unknown)
+  +(context.channel_requested?' · canale richiesto '+context.channel_requested:'')
+  +(context.persisted===false&&context.revision>0?' · memoria temporanea':'');
+}
 async function refresh(){if(pending||document.hidden)return;try{const response=await fetch('/api/status',{signal:AbortSignal.timeout(4000)});if(!response.ok)throw Error();const s=await response.json();document.querySelector('#connection').textContent=s.connected?'Socket connesso':'Server pronto';document.querySelector('#tv-health').textContent=s.connected?'Socket connesso':'Socket chiuso · si apre al comando';renderContext(s.context)}catch{document.querySelector('#connection').textContent='Server non raggiungibile'}}
 let healthFetching=false,healthSession=null;
 const healthText=(id,value,state)=>{const el=document.getElementById(id);el.textContent=value;if(state)el.dataset.state=state};
@@ -193,6 +626,28 @@ viewSelect.addEventListener('change',()=>command({context:viewSelect.value}));
 document.querySelector('#channel-form').addEventListener('submit',e=>{e.preventDefault();command({channel:document.querySelector('#channel').value})});
 document.querySelector('#channel-form').addEventListener('invalid',()=>logLine('Browser','Numero canale non valido: invio bloccato prima della richiesta HTTP',{level:'warning'}),true);
 document.querySelector('#copy-log').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(logRows.map(e=>e.timestamp+' ['+e.sender+'] '+(e.request_id?'#'+e.request_id.slice(-8)+' ':'')+e.message).join('\n'));logHealth.textContent='Log copiato negli appunti'}catch{logHealth.textContent='Copia non disponibile in questo browser: seleziona le righe del terminale'}});
+
+// These controls affect the local channel catalogue and responsive layout only.
+document.querySelector('#channel-search').addEventListener('input',event=>{
+ channelFilter=event.target.value;renderDirectory();
+});
+document.addEventListener('click',event=>{
+ const star=event.target.closest('button[data-fav-toggle]');
+ if(star){toggleFavorite(star.dataset.favToggle);return}
+ const category=event.target.closest('button[data-cat]');
+ if(category){
+  activeCat=category.dataset.cat;
+  document.querySelectorAll('button[data-cat]').forEach(button=>button.setAttribute('aria-pressed',String(button===category)));
+  renderDirectory();return;
+ }
+ const tab=event.target.closest('button[data-pane-tab]');
+ if(tab){
+  document.querySelector('#workspace').dataset.mobilePane=tab.dataset.paneTab;
+  document.querySelectorAll('button[data-pane-tab]').forEach(button=>button.setAttribute('aria-selected',String(button===tab)));
+ }
+});
+renderContext({source:'unknown',basis:'unknown',revision:0});
+
 logLine('Browser','Pagina caricata · origine '+location.host+' · nessun comando ritentato automaticamente');
 refreshHealth();setInterval(refreshHealth,10000);refresh();readLogs();refreshGuide();setInterval(refreshGuide,60000);setInterval(refresh,3000);setInterval(readLogs,1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshHealth();refresh();readLogs();refreshGuide()}});
 </script><script nonce="__CSRF__" src="/assets/keyboard.js"></script></body></html>

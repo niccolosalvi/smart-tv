@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Schermo PC · Salotto</title>
-<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#e8ecec;font-family:Arial,sans-serif}#frame,#screen-canvas,#screen-video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;display:none}#panel{position:absolute;bottom:5%;left:5%;right:5%;padding:20px;background:#182023;font-size:22px;line-height:1.5}h1{font-size:28px;margin:0 0 12px}button{padding:12px 20px;margin:12px 8px 0 0;background:#c0dfc8;border:0;border-radius:6px;font-size:20px;color:#182023}#status{margin:0}</style></head>
+<style>/* Ricevitore TV — stile minimal monocromatico, CSS compatibile con Samsung 2016 */
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fafafa;font-family:"Samsung One","SamsungOne",Arial,sans-serif}
+#frame,#screen-canvas,#screen-video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;display:none}
+#panel{position:absolute;left:6%;right:6%;bottom:7%;padding:28px 36px 30px;background:#111113;background:rgba(17,17,19,.95);border:1px solid #2c2c31;border-radius:16px;font-size:24px;line-height:1.5}
+#panel:before{content:"Salotto.";display:block;font-size:18px;font-weight:bold;color:#71717a;margin-bottom:4px}
+h1{font-size:36px;letter-spacing:-.6px;margin:0 0 8px;font-weight:bold;color:#fafafa}
+#status{margin:0 0 6px;color:#a1a1aa;min-height:36px}
+button{font-family:inherit;padding:14px 28px;margin:16px 12px 0 0;background:#18181b;border:2px solid #2c2c31;border-radius:10px;font-size:22px;font-weight:bold;color:#fafafa;cursor:pointer}
+button:focus,button:hover{outline:0;border-color:#fafafa;background:#222226}
+#reconnect{background:#fafafa;border-color:#fafafa;color:#09090b}
+#reconnect:focus,#reconnect:hover{background:#e4e4e7;border-color:#ffffff}
+#enable-audio{margin:0;padding:16px 30px;font-size:24px;background:#fafafa;border-color:#fafafa;color:#09090b}
+#enable-audio:focus,#enable-audio:hover{background:#e4e4e7;border-color:#ffffff}
+</style></head>
 <body><img id="frame" alt="Schermo condiviso dal PC"><canvas id="screen-canvas" style="display:none"></canvas><video id="screen-video" muted autoplay playsinline webkit-playsinline style="display:none"></video><div id="panel"><h1>Schermo PC</h1><p id="status" role="status">Connessione…</p><button id="reconnect">Ricollega</button><button id="fullscreen">Schermo intero</button></div>
 <script type="application/json" id="screen-config">__CONFIG__</script>
 <button id="enable-audio" style="display:none;position:absolute;top:5%;right:5%;z-index:2">Attiva audio</button>
