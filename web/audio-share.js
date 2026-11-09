@@ -8,9 +8,11 @@
    try{this.context=new AC({sampleRate:48000,latencyHint:'interactive'});this.context.resume().catch(()=>{});}
    catch(_){this.status('Audio non disponibile nel browser del PC.');}
   }
-  async start(track){
+  async start(track,surface='unknown'){
    if(!this.context||this.closed)return;
-   if(!track){this.status('Audio non condiviso: abilitalo nel dialogo del browser oppure scegli una scheda con audio.');this.stop();return;}
+   this.surface=['monitor','browser','window'].includes(surface)?surface:'unknown';
+   if(!track){this.status(this.surface==='monitor'?'Audio non condiviso: con «Schermo intero» attiva «Condividi audio del sistema», oppure scegli audio da una scheda.':'Audio non condiviso: abilitalo nel dialogo del browser oppure scegli una scheda con audio.');this.stop();return;}
+   this.lastSignal=performance.now();this.lastLevel=0;this.inputRms=0;
    this.track=track;track.onended=()=>{this.status('La sorgente audio è terminata.');this.stop();};
    try{
     const ac=this.context;await ac.resume();if(this.closed)return;
@@ -43,6 +45,14 @@
    }catch(error){this.status('Audio non disponibile: '+error.message);this.stop();}
   }
   samples(planes,time){
+   const now=performance.now();
+   if(!this.closed&&now-this.lastLevel>=500){
+    this.lastLevel=now;let power=0,count=0;
+    for(const plane of planes)for(let i=0;i<plane.length;i++){power+=plane[i]*plane[i];count++;}
+    this.inputRms=Math.min(1,Math.sqrt(power/Math.max(1,count)));
+    if(this.inputRms>.0001)this.lastSignal=now;
+    if(this.socket&&this.socket.readyState===WebSocket.OPEN)this.socket.send(JSON.stringify({type:'capture',surface:this.surface,inputRms:this.inputRms,muted:this.track.muted}));
+   }
    if(!this.ready||!this.active||this.closed||this.jobs>=3||this.pending.size>=3)return;
    // Re-correlate the device clock: AudioContext can pause during device startup
    // while performance.now keeps advancing. A fixed origin would mark live
@@ -76,8 +86,13 @@
    else if(data.type==='stop')this.stop();
    else if(data.type==='ack'){
     this.pending.delete(data.seq);
+    const now=performance.now();
+    if(now-(this.lastStatus||0)<1000&&this.lastState===data.state)return;
+    this.lastStatus=now;this.lastState=data.state;
     const format=(this.codec==='aac'?'AAC ':'ADPCM ')+this.bitrate/1000+' kb/s';
-    this.status(data.state==='suspended'?'Sulla TV premi «Attiva audio» con il telecomando.':format+' · '+(this.options.channels===2?'stereo':'mono')+' · buffer '+Math.round(data.bufferMs)+' ms');
+    const source=this.surface==='monitor'?'Audio di sistema':this.surface==='browser'?'Audio scheda':this.surface==='window'?'Audio finestra':'Audio';
+    const level=now-this.lastSignal>3000?' · nessun suono acquisito dal PC':'';
+    this.status(data.state==='suspended'?'Sulla TV premi «Attiva audio» con il telecomando.':source+' · '+format+' · '+(this.options.channels===2?'stereo':'mono')+' · buffer '+Math.round(data.bufferMs)+' ms'+level);
    }
   }
   packet(data){
@@ -99,6 +114,7 @@
    if(this.worker)this.worker.terminate();
    if(this.socket){this.socket.onclose=this.socket.onerror=this.socket.onmessage=null;this.socket.close();}
    if(this.context)this.context.close().catch(()=>{});
+   if(this.options.onStop)this.options.onStop();
   }
  }
  scope.ScreenAudioSender=ScreenAudioSender;

@@ -14,8 +14,11 @@
 <label>Modalità <select id="transport"><option value="auto">Automatica</option><option value="jpeg">Compatibile · immagini adattive</option></select></label>
 <p>La frequenza scelta è un limite richiesto. Il percorso video usa fino a 60 immagini/s; quello compatibile fino a 30, adattandosi al ricevitore.</p>
 <label><input id="audio-enabled" type="checkbox" checked> Condividi anche l’audio</label>
+<p>L’audio è destinato alla TV: al browser viene richiesto di silenziare la riproduzione locale durante la condivisione e ripristinarla quando termini.</p>
 <label>Qualità audio <select id="audio-quality"><option value="music">Musica e video · stereo</option><option value="voice">Voce · mono, meno banda</option></select></label>
-<p>Nel dialogo del browser abilita anche l’audio della scheda o del sistema. La disponibilità dipende dalla sorgente scelta e dal browser. Il microfono non viene acquisito.</p>
+<p>Con «Schermo intero», attiva anche «Condividi audio del sistema» nel dialogo del browser. Con una scheda, attiva «Condividi audio della scheda». Il microfono non viene acquisito.</p>
+<button id="select-audio" disabled>Scegli audio da una scheda…</button>
+<p>Se l’audio di sistema non arriva, questo pulsante consente di scegliere una scheda solo per il suono: le immagini restano quelle dello schermo già condiviso.</p>
 <p id="audio-status" role="status" aria-live="polite">Audio pronto, se incluso nella selezione del browser.</p>
 <div><button id="start" disabled>Condividi</button><button id="stop" disabled>Interrompi</button></div>
 <p id="status" role="status" aria-live="polite">Verifica del browser…</p>

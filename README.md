@@ -226,6 +226,21 @@ Audio-source availability depends on browser, OS and selected capture surface.
 Desktop Chrome/Edge on Windows can offer tab/system audio; a selected window
 may provide video only. The page never silently substitutes microphone capture.
 
+For **Schermo intero**, enable **Condividi audio del sistema** in the browser's
+native picker as well as the page's audio checkbox. Capture explicitly requests
+`suppressLocalAudioPlayback:true` with `restrictOwnAudio:false`: Chromium on
+Windows can select system `loopbackWithMute`, while browser-tab capture also
+requests suppressed local playback. This includes sound from other applications
+when the monitor/system-audio source is selected. The browser manages restoring
+local playback when its capture ends; support must be checked on the actual
+browser/driver. The sender measures incoming sound separately from
+TV playback so a live but silent track is reported as **nessun suono acquisito**.
+If the browser's system loopback remains silent, **Scegli audio da una scheda…**
+selects a separate sound source while keeping the original screen video. Its
+auxiliary video is disabled, requested at at most 1 fps/320×180, and never sent
+to the TV. Cancelling leaves the previous source intact; stopping sharing also
+stops the auxiliary capture. Neither request can bypass the native audio choice.
+
 ### Video transport
 
 The preferred transport is AVC baseline in fragmented MP4, encoded using

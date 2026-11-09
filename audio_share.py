@@ -130,6 +130,13 @@ class AudioRelay:
                                         'packets': 0, 'bytes': 0, 'buffer_ms': 0}
                         if self.viewer:
                             await self.viewer.send(json.dumps(self.config))
+                    elif role == 'sender' and data.get('type') == 'capture':
+                        level=data.get('inputRms')
+                        if (data.get('surface') not in ('monitor','browser','window','unknown') or
+                                type(data.get('muted')) is not bool or type(level) not in (int,float) or
+                                not math.isfinite(level) or not 0 <= level <= 1):
+                            raise ValueError('Livello cattura non valido')
+                        self.metrics.update(source=data['surface'],input_rms=round(level,6),track_muted=data['muted'])
                     elif role == 'viewer' and data.get('type') == 'ack':
                         if type(data.get('seq')) is not int:
                             raise ValueError('ACK audio non valido')

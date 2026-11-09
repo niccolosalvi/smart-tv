@@ -97,3 +97,12 @@ class AudioRelayTests(unittest.TestCase):
         sender.close();self.assertEqual(json.loads(viewer.recv(timeout=2))['type'],'stop')
         sender=self.peer('audio_sender');sender.send(packet())
         with self.assertRaises(ConnectionClosed):sender.recv(timeout=2)
+
+    def test_capture_diagnostics_identify_silent_system_input(self):
+        viewer=self.peer('audio_viewer');sender=self.peer('audio_sender');self.configure(sender,viewer)
+        sender.send('{"type":"capture","surface":"monitor","inputRms":0,"muted":false}')
+        sender.send(packet());viewer.recv(timeout=2)
+        self.assertEqual(self.relay.audio.snapshot()['source'],'monitor')
+        self.assertEqual(self.relay.audio.snapshot()['input_rms'],0)
+        sender.send('{"type":"capture","surface":"monitor","inputRms":NaN,"muted":false}')
+        with self.assertRaises(ConnectionClosed):sender.recv(timeout=2)

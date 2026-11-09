@@ -10,6 +10,12 @@ let pending=new Map(),statsTimer=null,statsTime=0,frames=0,bytes=0,acks=0,rtt=0,
 let encoderGeneration=0;
 let openingPromise=null,connectTimer=null;
 let audioSender=null;
+let auxiliaryAudio=null,pendingAudioSender=null,selectingAudio=false;
+const captureAudioOptions={echoCancellation:false,noiseSuppression:false,autoGainControl:false,
+ suppressLocalAudioPlayback:true,restrictOwnAudio:false};
+function audioOptions(onStop){const voice=$('audio-quality').value==='voice';return {channels:voice?1:2,bitrate:voice?64000:128000,onStop};}
+function audioStatus(text){$('audio-status').textContent=text;}
+function stopTracks(captured){if(captured)captured.getTracks().forEach(track=>track.stop());}
 const supported=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia&&window.Worker&&window.VideoFrame;
 $('open-tv').disabled=!config.available;
 async function tvCommand(action,keepalive=false){
@@ -36,6 +42,8 @@ function destroyWorker(){encoderGeneration++;if(worker){worker.terminate();worke
 function stop(text,keepalive=false){
  const close=needClose;needClose=false;generation++;running=false;clearInterval(statsTimer);clearTimeout(connectTimer);destroyWorker();
  if(audioSender){audioSender.stop();audioSender=null;}
+ if(pendingAudioSender){pendingAudioSender.stop();pendingAudioSender=null;}
+ stopTracks(auxiliaryAudio);auxiliaryAudio=null;$('select-audio').disabled=true;
  if(reader){reader.cancel().catch(()=>{});reader=null;}
  if(stream){stream.getTracks().forEach(track=>{track.onended=null;track.stop();});stream=null;}
  if(socket){socket.onclose=socket.onerror=socket.onmessage=null;socket.close();socket=null;}
@@ -118,16 +126,23 @@ $('start').onclick=async()=>{
  const epoch=++generation;$('start').disabled=true;message('Scegli cosa condividere nel browser.');
  try{
   const fps=Number($('fps').value),width=Number($('width').value);
-  const wantAudio=$('audio-enabled').checked,voice=$('audio-quality').value==='voice';
-  if(wantAudio)audioSender=new ScreenAudioSender({key:config.key,ws_url:wsUrl},{channels:voice?1:2,bitrate:voice?64000:128000},text=>{$('audio-status').textContent=text;});
+  const wantAudio=$('audio-enabled').checked;
+  if(wantAudio)audioSender=new ScreenAudioSender({key:config.key,ws_url:wsUrl},audioOptions(),audioStatus);
   else $('audio-status').textContent='Audio disattivato.';
-  const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:fps,max:fps},width:{ideal:width,max:width},height:{max:720}},audio:wantAudio?{echoCancellation:false,noiseSuppression:false,autoGainControl:false,suppressLocalAudioPlayback:true}:false,systemAudio:wantAudio?'include':'exclude'});
+  // Include all system/browser audio while requesting TV-only playback. With
+  // restrictOwnAudio=false, Chromium/Windows can select loopbackWithMute.
+  // Tab capture uses the same suppression request without excluding other apps
+  // from a monitor capture. The browser owns mute/restore for the capture lifetime.
+  const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:fps,max:fps},width:{ideal:width,max:width},height:{max:720}},
+   audio:wantAudio?{...captureAudioOptions}:false,systemAudio:wantAudio?'include':'exclude',
+   windowAudio:wantAudio?'system':'exclude',audioSelection:wantAudio?'preferred':undefined});
   if(epoch!==generation){captured.getTracks().forEach(track=>track.stop());return;}
   stream=captured;needClose=true;forceJPEG=$('transport').value==='jpeg';
   const track=stream.getVideoTracks()[0];try{track.contentHint='detail';}catch(ignored){}
   track.onended=()=>stop();$('stop').disabled=false;$('width').disabled=$('fps').disabled=$('transport').disabled=true;
   $('audio-enabled').disabled=$('audio-quality').disabled=true;
-  if(audioSender)audioSender.start(stream.getAudioTracks()[0]);
+  $('select-audio').disabled=false;
+  if(audioSender)audioSender.start(stream.getAudioTracks()[0],track.getSettings().displaySurface);
   $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
   const response=await fetch('/api/share');const live=await response.json();
   if(epoch!==generation)return;
@@ -153,5 +168,41 @@ $('start').onclick=async()=>{
   socket.onerror=()=>stop('Collegamento al Raspberry non riuscito.');
   socket.onclose=event=>stop('Connessione chiusa. '+(event.reason||'Ricarica la pagina e riprova.'));
  }catch(error){if(epoch===generation)stop('Cattura non avviata: '+error.message);}
+};
+$('select-audio').onclick=async()=>{
+ if(!stream||selectingAudio)return;
+ const epoch=generation;selectingAudio=true;$('select-audio').disabled=true;
+ let extra=null;
+ // Prepare the audio context inside this click's user activation, before the
+ // native picker consumes it. Do not interrupt the old source on cancellation.
+ const replacement=new ScreenAudioSender({key:config.key,ws_url:wsUrl},audioOptions(()=>stopTracks(extra)),audioStatus);
+ pendingAudioSender=replacement;
+ try{
+  extra=await navigator.mediaDevices.getDisplayMedia({
+   video:{displaySurface:'browser',width:{ideal:16,max:320},height:{ideal:16,max:180},frameRate:{ideal:1,max:1}},
+   audio:{...captureAudioOptions},systemAudio:'include',windowAudio:'system',audioSelection:'preferred'});
+  if(epoch!==generation){replacement.stop();stopTracks(extra);return;}
+  const sound=extra.getAudioTracks()[0];
+  if(!sound){replacement.stop();stopTracks(extra);audioStatus('Audio non incluso: riprova e attiva «Condividi audio» nel dialogo del browser.');return;}
+  const old=audioSender,oldSocket=old&&old.socket;
+  if(old)old.stop();
+  if(oldSocket&&oldSocket.readyState!==WebSocket.CLOSED)await new Promise(resolve=>{
+   oldSocket.addEventListener('close',resolve,{once:true});setTimeout(resolve,1200);
+  });
+  if(epoch!==generation){replacement.stop();stopTracks(extra);return;}
+  stopTracks(auxiliaryAudio);auxiliaryAudio=extra;audioSender=replacement;
+  $('audio-enabled').checked=true;
+  const picture=extra.getVideoTracks()[0];
+  // Keep the auxiliary display session alive at one tiny frame/s. Stopping its
+  // video track can also end audio on some browsers. It is never sent to the TV.
+  if(picture){picture.enabled=false;picture.onended=()=>replacement.stop();}
+  await replacement.start(sound,picture?picture.getSettings().displaySurface:'unknown');
+ }catch(error){
+  replacement.stop();stopTracks(extra);
+  if(epoch===generation)audioStatus(error.name==='NotAllowedError'?'Scelta audio annullata. La condivisione dello schermo continua.':'Audio non selezionato: '+error.message);
+ }finally{
+  if(pendingAudioSender===replacement)pendingAudioSender=null;
+  selectingAudio=false;$('select-audio').disabled=!stream;
+ }
 };
 $('stop').onclick=()=>stop();window.addEventListener('pagehide',()=>stop(undefined,true));
