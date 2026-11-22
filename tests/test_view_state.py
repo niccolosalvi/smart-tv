@@ -76,5 +76,27 @@ class ViewStateTests(unittest.TestCase):
                          ('tv', 'power_on_default', None))
         self.assertEqual(self.view.after_failure({'power': 'on'})['source'], 'unknown')
 
+    def test_sync_live_updates_context_from_real_tv_telemetry(self):
+        # Standby keeps current context without overwriting.
+        self.view.select('netflix', 'last_request')
+        self.assertEqual(self.view.sync_live(False, None, False)['source'], 'netflix')
+
+        # Active foreground app reported by TV REST API is authoritative.
+        state = self.view.sync_live(True, 'youtube', False)
+        self.assertEqual((state['source'], state['basis']), ('youtube', 'tv_verified'))
+
+        # Screen sharing active overrides to 'screen'.
+        state = self.view.sync_live(True, 'youtube', True)
+        self.assertEqual((state['source'], state['basis']), ('screen', 'tv_verified'))
+
+        # TV online with no streaming app visible returns from app/screen to 'tv'.
+        state = self.view.sync_live(True, None, False)
+        self.assertEqual((state['source'], state['basis']), ('tv', 'tv_verified'))
+
+        # Manual 'unknown' ('Tutti i comandi') is preserved while no app is foregrounded.
+        self.view.select('unknown', 'manual')
+        state = self.view.sync_live(True, None, False)
+        self.assertEqual((state['source'], state['basis']), ('unknown', 'manual'))
+
 if __name__ == '__main__':
     unittest.main()

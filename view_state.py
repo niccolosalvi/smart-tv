@@ -46,7 +46,7 @@ class ViewState:
             return self.get()
 
     def after_command(self, payload):
-        if 'youtube_search' in payload:
+        if 'youtube_search' in payload or 'youtube_url' in payload:
             return self.select('youtube', 'last_request')
         if payload.get('screen') == 'stop':
             return self.select('unknown', 'unconfirmed')
@@ -80,6 +80,30 @@ class ViewState:
                 if self.state['source'] in APP_VIEWS:
                     return self.get()
                 return self.select('unknown', 'unconfirmed')
-        if 'youtube_search' in payload or 'screen' in payload or 'power' in payload or 'app' in payload or 'source' in payload or 'channel' in payload or payload.get('key') in NAVIGATION | {'KEY_TV', 'KEY_HDMI1', 'KEY_CHUP', 'KEY_CHDOWN'}:
+        if 'youtube_search' in payload or 'youtube_url' in payload or 'screen' in payload or 'power' in payload or 'app' in payload or 'source' in payload or 'channel' in payload or payload.get('key') in NAVIGATION | {'KEY_TV', 'KEY_HDMI1', 'KEY_CHUP', 'KEY_CHDOWN'}:
             return self.select('unknown', 'unconfirmed')
         return self.get()
+
+    def sync_live(self, tv_online, active_app=None, screen_active=False):
+        with self.lock:
+            current = self.state['source']
+            basis = self.state['basis']
+            channel = self.state['channel_requested']
+            if screen_active:
+                if current != 'screen' or basis != 'tv_verified':
+                    return self.select('screen', 'tv_verified')
+                return self.get()
+            if not tv_online:
+                return self.get()
+            if active_app in APP_VIEWS:
+                if current != active_app or basis != 'tv_verified':
+                    return self.select(active_app, 'tv_verified')
+                return self.get()
+            # TV is ON, no streaming app is visible in foreground, and screen sharing is not active.
+            if basis == 'manual' and current not in APP_VIEWS | {'screen'}:
+                return self.get()
+            if current in APP_VIEWS | {'screen', 'unknown'}:
+                return self.select('tv', 'tv_verified', channel if current == 'tv' else None)
+            if basis != 'tv_verified':
+                return self.select(current, 'tv_verified', channel if current == 'tv' else None)
+            return self.get()

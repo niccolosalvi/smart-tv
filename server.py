@@ -22,7 +22,7 @@ from epg import Guide
 from health import Health
 from screen_share import ShareRelay
 from sharing_pages import render_share
-from text_input import validate_query
+from text_input import extract_youtube_video_id, validate_query
 from ios_setup import load_profile, setup_page
 from native_video import NativeCast
 
@@ -283,9 +283,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error': 'Cursore non valido'})
             return self.reply(200, timeline.read(after, query.get('epoch', [None])[0]))
         if self.path == '/api/status':
+            screen_active = (sharing is not None and sharing.viewer is not None) or (
+                native_cast.session is not None and not native_cast.session.closed)
+            live = remote.live_status()
+            active_app = live.get('active_app')
+            context = view.sync_live(live.get('tv_online', False), active_app, screen_active)
             return self.reply(200, {'host': HOST, 'port': PORT, 'connected': remote.tv.is_alive(),
-                'context': view.get(),
-                'note': 'Connessione socket; lo stato di volume e canale non viene letto dalla TV'})
+                'tv_online': live.get('tv_online', False),
+                'power_state': live.get('power_state', 'standby'),
+                'active_app': active_app,
+                'active_app_name': APPS[active_app]['name'] if active_app in APPS else None,
+                'screen_active': screen_active,
+                'context': context,
+                'note': 'Stato alimentazione e app verificato via REST locale; lo stato di volume e canale non viene letto dalla TV'})
         self.reply(404, {'error': 'Risorsa non trovata'})
 
     def do_POST(self):
@@ -342,6 +352,12 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     return self.reply(400, {'error': str(exc)})
                 keys, action = [], 'youtube:search'
+            elif 'youtube_url' in data:
+                try:
+                    extract_youtube_video_id(data['youtube_url'])
+                except ValueError as exc:
+                    return self.reply(400, {'error': str(exc)})
+                keys, action = [], 'youtube:play'
             elif 'screen' in data:
                 if data['screen'] not in ('open', 'stop'):
                     raise ValueError('Azione schermo non consentita')
@@ -390,6 +406,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if 'youtube_search' in data:
                 result = remote.search_youtube(data['youtube_search'])
+            elif 'youtube_url' in data:
+                result = remote.play_youtube_url(data['youtube_url'])
             elif 'screen' in data:
                 if data['screen'] == 'open':
                     if sharing.viewer is not None:
@@ -413,9 +431,13 @@ class Handler(BaseHTTPRequestHandler):
                 result = remote.switch_to_tv()
             else:
                 result = remote.send(keys, action)
+            if hasattr(remote, 'invalidate_status_cache'):
+                remote.invalidate_status_cache()
             result['context'] = view.after_command(data)
             self.reply(200, result)
         except RuntimeError as exc:
+            if hasattr(remote, 'invalidate_status_cache'):
+                remote.invalidate_status_cache()
             self.reply(502, {'error': str(exc), 'context': view.after_failure(data),
                 'hint': 'Verifica TV accesa e autorizzazione Smart TV Locale'})
         finally:

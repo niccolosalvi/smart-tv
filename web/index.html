@@ -23,7 +23,9 @@ button[aria-disabled="true"],button:disabled{opacity:.38;cursor:default}
 h1{font-size:19px;letter-spacing:-.5px;margin:0;font-weight:650;color:var(--white)}
 h1 span{color:var(--dim)}
 .sub{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--white);display:inline-block}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);display:inline-block;transition:background .2s,box-shadow .2s}
+.dot[data-state="on"]{background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.16)}
+.dot[data-state="standby"]{background:var(--dim)}
 .power-tools{display:inline-flex;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:2px;gap:2px}
 .power-tools button{min-height:30px;height:30px;padding:0 10px;border:0;border-radius:6px;background:transparent;font-size:11.5px;font-weight:550;gap:4px;color:var(--text-2)}
 .power-tools button:hover{background:var(--surface-2);color:var(--white)}
@@ -61,8 +63,9 @@ h1 span{color:var(--dim)}
 h2{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0}
 .compact-info{color:var(--dim);font-size:11.5px;line-height:1.45;margin:6px 0 0}
 
-/* YouTube Search */
+/* YouTube Search & Direct Link */
 .search-label{display:block;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.yt-url-form{margin-bottom:12px}
 form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:0}
 input,select.field-select{width:100%;min-width:0;height:40px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:0 12px;font-size:14px;color:var(--text)}
 input::placeholder{font-size:12.5px;color:var(--dim)}
@@ -243,7 +246,7 @@ footer{display:flex;justify-content:space-between;align-items:center;color:var(-
 <div class="app">
 <header class="topbar">
 <div class="topbar-row">
-<div class="brand"><h1>Salotto<span>.</span></h1><div class="sub"><span class="dot" aria-hidden="true"></span><span id="connection">Locale</span></div></div>
+<div class="brand"><h1>Salotto<span>.</span></h1><div class="sub"><span class="dot" id="power-dot" aria-hidden="true"></span><span id="connection">Verifica TV…</span></div></div>
 <div class="power-tools"><button class="power-on" data-power="on" aria-label="Accendi TV" title="Accendi (Wake-on-LAN)"><svg class="icon"><use href="#i-power"/></svg><span>On</span></button><button class="power-off" data-power="off" aria-label="Spegni TV" title="Spegni (standby)"><svg class="icon"><use href="#i-power"/></svg><span>Off</span></button></div>
 </div>
 <nav class="sources" aria-label="Modalità e sorgenti TV">
@@ -273,13 +276,18 @@ footer{display:flex;justify-content:space-between;align-items:center;color:var(-
 </div>
 
 <div class="col-remote">
-<section id="text-panel" class="sect" aria-label="Ricerca YouTube">
+<section id="text-panel" class="sect" aria-label="Ricerca e link YouTube">
+<label for="youtube-url" class="search-label">Link video YouTube</label>
+<form id="youtube-url-form" class="yt-url-form" autocomplete="off">
+<input id="youtube-url" type="text" maxlength="512" placeholder="Incolla link YouTube (es. youtu.be/...)" aria-label="Link al video YouTube" enterkeyhint="go" required>
+<button type="submit">Riproduci</button>
+</form>
 <label for="youtube-query" class="search-label">Cerca su YouTube</label>
 <form id="youtube-search-form" role="search" autocomplete="off">
 <input id="youtube-query" type="search" maxlength="128" placeholder="Cerca un video sulla TV" aria-label="Cerca un video sulla TV" aria-describedby="youtube-search-note" enterkeyhint="search" required>
 <button type="submit">Cerca</button>
 </form>
-<p id="youtube-search-note" class="compact-info">Scrivi con la tastiera del dispositivo e premi Cerca. I risultati si aprono nell’app YouTube sulla TV.</p>
+<p id="youtube-search-note" class="compact-info">Con un link la TV apre YouTube, preme OK sul profilo e avvia direttamente il video. Con Cerca apre i risultati nell’app.</p>
 </section>
 <p id="app-search-unavailable" class="compact-info" hidden>Su questa TV la ricerca da PC o smartphone è disponibile solo per YouTube. Per questa app usa la ricerca sulla TV.</p>
 
@@ -555,12 +563,33 @@ function renderContext(context){
   if(button.dataset.source===source)button.setAttribute('aria-current','true');
   else button.removeAttribute('aria-current');
  });
- const reasons={unknown:'Sorgente non rilevata · scegli una vista',manual:'Vista manuale · sorgente non verificata',last_request:'Da ultimo comando · sorgente non verificata',restored:'Vista salvata · sorgente non verificata',unconfirmed:'Sorgente incerta · tutti i comandi',power_request:'Sorgente non rilevata dopo Power',power_on_default:'Accensione richiesta · vista antenna predefinita'};
+ const reasons={tv_verified:'Stato reale verificato dalla TV',unknown:'Sorgente non rilevata · scegli una vista',manual:'Vista manuale · sorgente non verificata',last_request:'Da ultimo comando · verifica in corso',restored:'Vista salvata · verifica in corso',unconfirmed:'Sorgente incerta · tutti i comandi',power_request:'Sorgente non rilevata dopo Power',power_on_default:'Accensione richiesta · vista antenna predefinita'};
  document.querySelector('#context-note').textContent=(reasons[context.basis]||reasons.unknown)
   +(context.channel_requested?' · canale richiesto '+context.channel_requested:'')
   +(context.persisted===false&&context.revision>0?' · memoria temporanea':'');
 }
-async function refresh(){if(pending||document.hidden)return;try{const response=await fetch('/api/status',{signal:AbortSignal.timeout(4000)});if(!response.ok)throw Error();const s=await response.json();document.querySelector('#connection').textContent=s.connected?'Socket connesso':'Server pronto';document.querySelector('#tv-health').textContent=s.connected?'Socket connesso':'Socket chiuso · si apre al comando';renderContext(s.context)}catch{document.querySelector('#connection').textContent='Server non raggiungibile'}}
+async function refresh(){
+ if(pending||document.hidden)return;
+ try{
+  const response=await fetch('/api/status',{signal:AbortSignal.timeout(4000)});
+  if(!response.ok)throw Error();
+  const s=await response.json();
+  const dot=document.querySelector('#power-dot');
+  if(s.tv_online){
+   if(dot)dot.dataset.state='on';
+   const activeLabel=s.active_app_name||(s.screen_active?'Schermo PC':null);
+   document.querySelector('#connection').textContent='TV accesa'+(activeLabel?' · '+activeLabel:'');
+   document.querySelector('#tv-health').textContent='TV accesa'+(activeLabel?' · '+activeLabel:'')+(s.connected?' · socket attivo':'');
+  }else{
+   if(dot)dot.dataset.state='standby';
+   document.querySelector('#connection').textContent='TV in standby';
+   document.querySelector('#tv-health').textContent='TV in standby / non raggiungibile';
+  }
+  renderContext(s.context);
+ }catch{
+  document.querySelector('#connection').textContent='Server non raggiungibile';
+ }
+}
 let healthFetching=false,healthSession=null;
 const healthText=(id,value,state)=>{const el=document.getElementById(id);el.textContent=value;if(state)el.dataset.state=state};
 const duration=value=>value==null?'Non disponibile':Math.floor(value/86400)+' g '+Math.floor(value%86400/3600)+' h '+Math.floor(value%3600/60)+' min';
@@ -592,7 +621,7 @@ async function refreshHealth(){
 }
 document.querySelector('#check-health').addEventListener('click',()=>{refreshHealth();refresh()});
 document.querySelector('#reload-page').addEventListener('click',()=>{if(!pending)location.reload()});
-function describe(payload){if(Object.hasOwn(payload,'youtube_search'))return 'Ricerca YouTube · query esclusa dai log';if(payload.screen)return 'Apri schermo PC nel browser TV';if(payload.source)return 'Apri PC · HDMI 1';if(payload.volume)return 'Volume '+(payload.volume>0?'+':'')+payload.volume;if(payload.key)return payload.key;if(payload.channel)return 'Canale '+payload.channel;if(payload.app)return 'Apri '+names[payload.app];if(payload.power)return payload.power==='on'?'Accendi (Wake-on-LAN)':'Spegni (Power breve)';return 'Vista '+(names[payload.context]||'completa')}
+function describe(payload){if(Object.hasOwn(payload,'youtube_url'))return 'Avvio link YouTube · URL escluso dai log';if(Object.hasOwn(payload,'youtube_search'))return 'Ricerca YouTube · query esclusa dai log';if(payload.screen)return 'Apri schermo PC nel browser TV';if(payload.source)return 'Apri PC · HDMI 1';if(payload.volume)return 'Volume '+(payload.volume>0?'+':'')+payload.volume;if(payload.key)return payload.key;if(payload.channel)return 'Canale '+payload.channel;if(payload.app)return 'Apri '+names[payload.app];if(payload.power)return payload.power==='on'?'Accendi (Wake-on-LAN)':'Spegni (Power breve)';return 'Vista '+(names[payload.context]||'completa')}
 // Correlation IDs are not credentials. randomUUID is unavailable on HTTP LAN
 // pages in some mobile browsers; keep command dispatch working there too.
 function newRequestId(){return typeof globalThis.crypto?.randomUUID==='function'?globalThis.crypto.randomUUID():'web-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
@@ -600,19 +629,20 @@ async function command(payload){
  const description=describe(payload);
  if(pending){logLine('Browser','Clic ignorato: comando già in corso · '+description,{level:'warning'});return}
  const id=newRequestId();pending=true;
- document.querySelectorAll('button[data-key],button[data-channel],button[data-app],button[data-power],button[data-volume],button[data-input],button[data-screen],#channel-form button,#youtube-search-form button,select').forEach(b=>{b.setAttribute('aria-disabled','true')});
- status.textContent=payload.context?'Cambio vista…':'Invio alla TV…';
+ document.querySelectorAll('button[data-key],button[data-channel],button[data-app],button[data-power],button[data-volume],button[data-input],button[data-screen],#channel-form button,#youtube-search-form button,#youtube-url-form button,select').forEach(b=>{b.setAttribute('aria-disabled','true')});
+ status.textContent=payload.context?'Cambio vista…':Object.hasOwn(payload,'youtube_url')?'Apertura YouTube, selezione profilo (OK) e avvio video…':'Invio alla TV…';
  logLine('Browser → Server',description+' · invio HTTP',{request_id:id});
  const start=performance.now();
  try{
-  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':controlKey,'X-Request-ID':id},body:JSON.stringify(payload),signal:AbortSignal.timeout(20000)});
+  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':controlKey,'X-Request-ID':id},body:JSON.stringify(payload),signal:AbortSignal.timeout(25000)});
   const data=await response.json();
   const roundtrip=Math.round(performance.now()-start);
   await readLogs();
   logLine('Browser','Ricevuto HTTP '+response.status+' · totale '+roundtrip+' ms · server '+(data.server_elapsed_ms??'?')+' ms',{request_id:id,level:response.ok?'info':'error'});
   renderContext(data.context);
   if(!response.ok)throw Error(data.error+(data.hint?' · '+data.hint:''));
-  if(Object.hasOwn(payload,'youtube_search')){status.textContent=data.status==='demo'?'Demo: nessuna ricerca inviata alla TV.':'Ricerca inviata a YouTube sulla TV. Usa le frecce per scegliere un video.'}
+  if(Object.hasOwn(payload,'youtube_url')){status.textContent='YouTube aperto, profilo confermato con OK e video avviato sulla TV.'}
+  else if(Object.hasOwn(payload,'youtube_search')){status.textContent=data.status==='demo'?'Demo: nessuna ricerca inviata alla TV.':'Ricerca inviata a YouTube sulla TV. Usa le frecce per scegliere un video.'}
   else if(payload.context){status.textContent='Vista aggiornata. Nessun comando inviato alla TV.'}
   else if(payload.screen){status.textContent='Apertura del ricevitore richiesta sulla TV. Caricamento pagina non confermato.'}
   else{status.textContent=payload.power?(payload.power==='on'?'Risveglio via rete inviato. Attendi alcuni secondi e verifica la TV.':'Spegnimento richiesto con pressione breve Power. Verifica la TV.'):payload.app?`${data.app_name}: apertura richiesta · ${roundtrip} ms. Vista adattata; riproduzione non verificata.`:`Inviato · ${roundtrip} ms complessivi. Effetto sullo schermo non confermato.`;if(payload.key||payload.channel||payload.volume||payload.source)document.querySelector('#connection').textContent='Socket connesso'}

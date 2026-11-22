@@ -39,6 +39,7 @@ class CommandTests(unittest.TestCase):
         self.transport.open_screen.return_value = {'status': 'sent'}
         self.transport.close_screen.return_value = {'status': 'sent'}
         self.transport.search_youtube.return_value = {'status': 'sent', 'transport': 'dial'}
+        self.transport.play_youtube_url.return_value = {'status': 'sent', 'transport': 'rest+ws+dial'}
         for name, value in [('remote', self.transport),
                             ('view', ViewState(Path(folder.name)/'view.json'))]:
             p = patch.object(server, name, value)
@@ -111,6 +112,16 @@ class CommandTests(unittest.TestCase):
 
     def test_largest_supported_unicode_query_fits_request_limit(self):
         self.assertEqual(self.post({'youtube_search': '🎵' * 128})[0], 200)
+
+    def test_youtube_url_validates_and_dispatches_to_remote(self):
+        server.view.select('tv')
+        code, data = self.post({'youtube_url': 'https://youtu.be/dQw4w9WgXcQ'})
+        self.assertEqual(code, 200)
+        self.assertEqual(data['context']['source'], 'youtube')
+        self.transport.play_youtube_url.assert_called_once_with('https://youtu.be/dQw4w9WgXcQ')
+        for bad in ['', 'https://evil.example/watch?v=dQw4w9WgXcQ', 123, None]:
+            self.assertEqual(self.post({'youtube_url': bad})[0], 400)
+        self.assertEqual(self.transport.play_youtube_url.call_count, 1)
 
     def test_pc_switch_selects_pc_context(self):
         code, data = self.post({'source': 'pc'})

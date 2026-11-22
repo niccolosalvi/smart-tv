@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 from samsungtvws import SamsungTVWS
 from diagnostics import timeline, tv_event
-from text_input import youtube_search_payload
+from text_input import youtube_search_payload, youtube_video_payload
 
 logging.getLogger('samsungtvws').setLevel(logging.CRITICAL)
 logging.getLogger('websocket').setLevel(logging.CRITICAL)
@@ -59,9 +59,50 @@ class Remote:
         self.lock = threading.Lock()
         self.trace_events = trace_events
         self._closing = set()
+        self._status_cache = None
+        self._status_time = 0.0
         self.tv = (ObservedTV if trace_events else SamsungTVWS)(host=HOST, port=PORT, timeout=timeout,
             name=os.environ.get('TV_CLIENT_NAME', 'Smart TV Locale'),
             token_file=str(STATE / 'tv-token'), key_press_delay=0.35)
+
+    def invalidate_status_cache(self):
+        self._status_cache = None
+        self._status_time = 0.0
+
+    def live_status(self, cache_ttl=2.5):
+        now = time.monotonic()
+        cached = self._status_cache
+        if cached is not None and now - self._status_time < cache_ttl:
+            return cached.copy()
+        timeout = 0.25 if HOST in {'127.0.0.1', 'localhost'} else 1.2
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(f'http://{HOST}:8001/api/v2/', timeout=timeout) as response:
+                if response.status != 200:
+                    raise OSError('HTTP ' + str(response.status))
+                json.load(response)
+        except Exception:
+            result = {'tv_online': False, 'power_state': 'standby', 'active_app': None, 'running_apps': []}
+            self._status_cache = result
+            self._status_time = now
+            return result.copy()
+
+        active_app = None
+        running_apps = []
+        for key, info in APPS.items():
+            try:
+                with opener.open(f'http://{HOST}:8001/api/v2/applications/{info["id"]}', timeout=0.9) as response:
+                    data = json.load(response)
+                if data.get('running') is True:
+                    running_apps.append(key)
+                if data.get('visible') is True and active_app is None:
+                    active_app = key
+            except Exception:
+                continue
+        result = {'tv_online': True, 'power_state': 'on', 'active_app': active_app, 'running_apps': running_apps}
+        self._status_cache = result
+        self._status_time = now
+        return result.copy()
 
     def connect(self):
         start = time.perf_counter()
@@ -150,6 +191,81 @@ class Remote:
                               note='Ricerca richiesta nell’app YouTube; risultati non letti dal server')
             except Exception as exc:
                 record('youtube:search', started, 'error', error_type=type(exc).__name__)
+                raise RuntimeError(type(exc).__name__) from None
+
+    def play_youtube_url(self, url, launch_delay=None):
+        body = youtube_video_payload(url)
+        with self.lock:
+            started = time.perf_counter()
+            try:
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                app_url = f'http://{HOST}:8001/api/v2/applications/{APPS["youtube"]["id"]}'
+                was_running = False
+                was_visible = False
+                try:
+                    with opener.open(app_url, timeout=2) as response:
+                        pre = json.load(response)
+                        was_running = pre.get('running') is True
+                        was_visible = pre.get('visible') is True
+                except Exception:
+                    pass
+
+                # 1. Open / foreground YouTube via Samsung REST API.
+                launch_req = urllib.request.Request(app_url, data=b'', method='POST')
+                timeline.emit('Server → TV', 'REST POST apertura YouTube per riproduzione link')
+                with opener.open(launch_req, timeout=6) as response:
+                    launch_status = response.status
+                timeline.emit('TV', f'REST apertura YouTube: HTTP {launch_status}')
+
+                visible = was_visible
+                if not visible:
+                    for _ in range(5):
+                        if launch_delay is None:
+                            time.sleep(0.7)
+                        try:
+                            with opener.open(app_url, timeout=2) as response:
+                                state = json.load(response)
+                            if state.get('visible') is True:
+                                visible = True
+                                break
+                        except Exception:
+                            break
+
+                # 2. Wait for the profile picker ("Chi sta guardando?") and press OK (KEY_ENTER).
+                if launch_delay is not None:
+                    if launch_delay > 0:
+                        time.sleep(launch_delay)
+                else:
+                    time.sleep(1.0 if was_visible else (1.8 if was_running else 3.2))
+
+                if not self.tv.is_alive():
+                    self.connect()
+                else:
+                    timeline.emit('Server', 'Riutilizzo WebSocket esistente')
+                timeline.emit('Server → TV', 'WS Click KEY_ENTER · selezione profilo YouTube')
+                self.tv.send_key('KEY_ENTER')
+
+                if launch_delay is not None:
+                    if launch_delay > 0:
+                        time.sleep(launch_delay)
+                else:
+                    time.sleep(1.2)
+
+                # 3. Play the requested video directly via DIAL.
+                dial_req = urllib.request.Request(f'http://{HOST}:8080/ws/apps/YouTube',
+                    data=body, method='POST', headers={
+                        'Origin': 'https://www.youtube.com',
+                        'Content-Type': 'application/x-www-form-urlencoded'})
+                timeline.emit('Server → TV', 'DIAL avvio video YouTube · link escluso dai log')
+                with opener.open(dial_req, timeout=6) as response:
+                    http_status = response.status
+                self.invalidate_status_cache()
+                return record('youtube:play', started, 'sent', transport='rest+ws+dial',
+                              http_status=http_status, visible=visible,
+                              note='YouTube aperto, profilo confermato con OK e video avviato')
+            except Exception as exc:
+                self.tv.close()
+                record('youtube:play', started, 'error', error_type=type(exc).__name__)
                 raise RuntimeError(type(exc).__name__) from None
 
     def switch_to_tv(self):
