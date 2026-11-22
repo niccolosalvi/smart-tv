@@ -47,7 +47,10 @@ class ShareNavigationBrowserTests(unittest.TestCase):
                             const stream=canvas.captureStream(15);window.captureTrack=stream.getVideoTracks()[0];return stream;
                         };
                     ''')
-                    sender.goto(base+'/share')
+                    sender.goto(base+'/')
+                    sender.locator('button[data-screen="open"]').click()
+                    expect(sender).to_have_url(base+'/share',timeout=10000)
+                    remote.open_screen.assert_not_called()
                     expect(sender.locator('#open-tv')).to_have_count(0)
                     expect(sender.locator('#preview-panel')).to_have_count(0)
                     sender.locator('button[data-volume="2"]').click()
