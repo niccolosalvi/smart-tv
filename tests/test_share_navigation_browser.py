@@ -49,6 +49,11 @@ class ShareNavigationBrowserTests(unittest.TestCase):
                     ''')
                     sender.goto(base+'/share')
                     expect(sender.locator('#open-tv')).to_have_count(0)
+                    expect(sender.locator('#preview-panel')).to_have_count(0)
+                    sender.locator('button[data-volume="2"]').click()
+                    deadline=time.monotonic()+4
+                    while remote.send.call_count<1 and time.monotonic()<deadline:sender.wait_for_timeout(50)
+                    remote.send.assert_called_once_with(['KEY_VOLUP','KEY_VOLUP'],'volume:2')
                     video_sect=sender.locator('#video-section')
                     audio_sect=sender.locator('#audio-section')
                     self.assertIsNone(video_sect.get_attribute('open'))

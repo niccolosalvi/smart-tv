@@ -58,7 +58,7 @@ function load(saved) {
   netflix:['app-search-unavailable','navigation-panel','media-panel','app-volume'],
   primevideo:['app-search-unavailable','navigation-panel','media-panel','app-volume'],
   pc:['app-volume'],
-  screen:['navigation-panel','app-volume','screen-panel'],
+  screen:['app-volume','screen-panel'],
   unknown:['text-panel','navigation-panel','media-panel','channels-panel','screen-panel']
  };
  const panels=['text-panel','navigation-panel','media-panel','app-volume',

@@ -42,10 +42,10 @@ if(target.origin===location.origin)$('back').addEventListener('click',returnToRe
 const captureAudioOptions={echoCancellation:false,noiseSuppression:false,autoGainControl:false,
  suppressLocalAudioPlayback:true,restrictOwnAudio:false};
 function clearLatest(){if(latestFrame){latestFrame.close();latestFrame=null;}}
-const preview=$('preview'),previewDetails=preview&&preview.closest?preview.closest('details'):null;
+const preview=$('preview');
 function syncPreview(){
  if(!preview)return;
- const needVideo=!!stream&&(typeof MediaStreamTrackProcessor!=='function'||(previewDetails&&previewDetails.open));
+ const needVideo=!!stream&&typeof MediaStreamTrackProcessor!=='function';
  if(needVideo){
   preview.hidden=false;
   if(preview.srcObject!==stream){preview.srcObject=stream;if(preview.play)preview.play().catch(()=>{});}
@@ -54,7 +54,29 @@ function syncPreview(){
   preview.srcObject=null;preview.hidden=true;
  }
 }
-if(previewDetails&&previewDetails.addEventListener)previewDetails.addEventListener('toggle',syncPreview);
+let volumePending=false;
+async function sendVolumeCommand(payload){
+ if(volumePending||target.origin!==location.origin)return;
+ volumePending=true;
+ const buttons=document.querySelectorAll?document.querySelectorAll('.volume-row button'):[];
+ buttons.forEach(b=>{b.disabled=true;});
+ try{
+  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':config.key},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error||'Comando rifiutato');
+ }catch(error){
+  $('tv-status').textContent='Volume TV: '+error.message;
+ }finally{
+  volumePending=false;
+  buttons.forEach(b=>{b.disabled=false;});
+ }
+}
+if(document.addEventListener)document.addEventListener('click',event=>{
+ const btn=event.target&&event.target.closest?event.target.closest('button[data-volume],button[data-key]'):null;
+ if(!btn)return;
+ if(btn.dataset.volume)sendVolumeCommand({volume:Number(btn.dataset.volume)});
+ else if(btn.dataset.key)sendVolumeCommand({key:btn.dataset.key});
+});
 function audioOptions(onStop){const voice=$('audio-quality').value==='voice';return {channels:voice?1:2,bitrate:voice?64000:128000,onStop};}
 function audioStatus(text){$('audio-status').textContent=text;}
 function stopTracks(captured){if(captured)captured.getTracks().forEach(track=>track.stop());}
@@ -215,7 +237,6 @@ async function readFrames(epoch){
  }else{
   captureMode=' · tieni attiva questa scheda';
   const video=$('preview');
-  video.closest('details').open=true;
   function next(now,metadata){
    if(epoch!==generation)return;
    if(video.videoWidth)push(new VideoFrame(video,{timestamp:Math.round((metadata?metadata.mediaTime:now/1000)*1000000)}));
@@ -256,7 +277,6 @@ $('start').onclick=async()=>{
   $('select-audio').disabled=false;
   if(audioSender)audioSender.start(stream.getAudioTracks()[0],track.getSettings().displaySurface);
   if(typeof MediaStreamTrackProcessor!=='function'){
-   if(previewDetails)previewDetails.open=true;
    $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
   }else syncPreview();
   if(nativeMode){

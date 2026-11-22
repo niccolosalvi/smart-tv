@@ -542,7 +542,7 @@ function renderContext(context){
  document.querySelector('#app-search-unavailable').hidden=!['netflix','primevideo'].includes(source);
  document.querySelector('#channels-panel').hidden=!['unknown','tv'].includes(source);
  document.querySelector('#media-panel').hidden=['tv','pc','screen'].includes(source);
- document.querySelector('#navigation-panel').hidden=['tv','pc'].includes(source);
+ document.querySelector('#navigation-panel').hidden=['tv','pc','screen'].includes(source);
  document.querySelector('#app-volume').hidden=['tv','unknown'].includes(source);
  document.querySelector('#screen-panel').hidden=!['screen','unknown'].includes(source);
  const workspace=document.querySelector('#workspace');
