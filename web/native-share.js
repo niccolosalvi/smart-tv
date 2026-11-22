@@ -19,8 +19,10 @@ class ScreenNativeSender{
   const result=await this.request('/api/native/start',JSON.stringify(options.receiver==='tizen'?{receiver:'tizen'}:{}));this.id=result.id;
   if(this.stopped){await this.request('/api/native/'+this.id+'/stop','{}');return;}
   const track=stream.getVideoTracks()[0],settings=track.getSettings();
-  this.label=(settings.width||options.width)+'×'+(settings.height||Math.round(options.width*9/16))+' · cattura '+Math.round(settings.frameRate||options.fps)+' immagini/s';
-  this.recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:12000000,audioBitsPerSecond:128000,videoKeyFrameIntervalDuration:1000});
+  const w=settings.width||options.width,h=settings.height||Math.round(options.width*9/16),fps=Math.round(settings.frameRate||options.fps);
+  this.label=w+'×'+h+' · cattura '+fps+' immagini/s';
+  const videoBps=Math.round(Math.max(2500000,Math.min(12000000,w*h*fps*.10)));
+  this.recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:videoBps,audioBitsPerSecond:128000,videoKeyFrameIntervalDuration:1000});
   this.recorder.ondataavailable=event=>{
    if(this.stopped||!event.data.size)return;
    if(this.queued+event.data.size>8*1024*1024){this.fail(Error('La rete non tiene il passo del video. Riduci la frequenza o la risoluzione.'));return;}

@@ -88,10 +88,11 @@ class NativeSession:
         self.last_pts = None
         self.rate_pts = None
         self.rate_frames = 0
+        self.popped = 0
         self.last_input = time.monotonic()
         self.inputs = queue.Queue(maxsize=8)
         self.process = subprocess.Popen([executable,'-hide_banner','-loglevel','error',
-            '-probesize','65536','-analyzeduration','1000000','-i','pipe:0',
+            '-fflags','+nobuffer','-probesize','65536','-analyzeduration','400000','-max_delay','0','-i','pipe:0',
             '-map','0:v:0','-map','0:a:0?','-c','copy','-bsf:v','h264_mp4toannexb',
             '-mpegts_flags','+resend_headers','-pcr_period','20',
             '-pat_period','0.1','-muxdelay','0','-muxpreload','0',
@@ -134,26 +135,36 @@ class NativeSession:
     def _read(self):
         try:
             while not self.closed:
-                data=self.process.stdout.read(32768)
+                data=self.process.stdout.read(65536)
                 if not data:break
                 self._measure_video(data)
                 with self.condition:
                     self.chunks.append((self.end,data));self.end+=len(data)
                     while self.end-self.base>self.max_buffer:
-                        offset,old=self.chunks.popleft();self.base=offset+len(old)
+                        offset,old=self.chunks.popleft();self.base=offset+len(old);self.popped+=1
                     self.condition.notify_all()
         finally:
             if not self.closed:self.close('Il remuxer ha terminato il flusso')
             self.process.stdout.close()
 
     def stream(self):
-        offset=0
+        offset=0;idx=0;seen_popped=0
         while True:
             with self.condition:
                 self.condition.wait_for(lambda:self.closed or self.end>offset,timeout=2)
                 if self.closed:return
                 if offset<self.base:raise RuntimeError('Buffer TV superato')
-                data=next((data[offset-start:] for start,data in self.chunks if start<=offset<start+len(data)),b'')
+                evicted=self.popped-seen_popped
+                if evicted:
+                    idx=max(0,idx-evicted)
+                    seen_popped=self.popped
+                while idx<len(self.chunks) and self.chunks[idx][0]+len(self.chunks[idx][1])<=offset:
+                    idx+=1
+                data=b''
+                if idx<len(self.chunks):
+                    start,chunk=self.chunks[idx]
+                    if start<=offset<start+len(chunk):
+                        data=chunk[offset-start:]
             if data:
                 offset+=len(data);self.delivered=max(self.delivered,offset)
                 yield data
@@ -164,7 +175,7 @@ class NativeSession:
                 self.condition.wait_for(lambda:self.closed or self.end>0,timeout=12)
                 if self.closed:return
                 if not self.end:raise RuntimeError('Nessun video dal codificatore')
-            time.sleep(.75)
+                self.condition.wait_for(lambda:self.closed or self.end>=131072,timeout=0.35)
             if self.closed:return
             if self.launcher:
                 self.launcher(self.url)
@@ -202,19 +213,19 @@ class NativeSession:
     def _measure_video(self, data):
         # FFmpeg progress out_time follows whichever track is ahead (often
         # audio). Count video PES timestamps instead, over >=5 seconds of media.
-        data=self.ts_tail+data
-        complete=len(data)//188*188
-        self.ts_tail=data[complete:]
+        buf=self.ts_tail+data if self.ts_tail else data
+        complete=len(buf)//188*188
+        self.ts_tail=bytes(buf[complete:]) if complete<len(buf) else b''
         for offset in range(0,complete,188):
-            packet=data[offset:offset+188]
-            if packet[0]!=0x47 or not packet[1]&0x40:continue
-            payload=4
-            adaptation=(packet[3]>>4)&3
+            if buf[offset]!=0x47 or not buf[offset+1]&0x40:continue
+            adaptation=(buf[offset+3]>>4)&3
             if adaptation not in (1,3):continue
-            if adaptation==3:payload+=1+packet[4]
-            pes=packet[payload:]
-            if len(pes)<14 or pes[:3]!=b'\x00\x00\x01' or not 0xe0<=pes[3]<=0xef or not pes[7]&0x80:continue
-            pts=((pes[9]&14)<<29)|(pes[10]<<22)|((pes[11]&254)<<14)|(pes[12]<<7)|(pes[13]>>1)
+            pos=offset+4
+            if adaptation==3:pos+=1+buf[pos]
+            if pos+14>offset+188:continue
+            if buf[pos]!=0 or buf[pos+1]!=0 or buf[pos+2]!=1:continue
+            if not 0xe0<=buf[pos+3]<=0xef or not buf[pos+7]&0x80:continue
+            pts=((buf[pos+9]&14)<<29)|(buf[pos+10]<<22)|((buf[pos+11]&254)<<14)|(buf[pos+12]<<7)|(buf[pos+13]>>1)
             if pts==self.last_pts:continue
             self.last_pts=pts;self.video_frames+=1
             if self.rate_pts is None:self.rate_pts=pts;self.rate_frames=self.video_frames

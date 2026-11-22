@@ -29,7 +29,7 @@ $('remote-stop').onclick=()=>stop();
 let stream=null,socket=null,reader=null,worker=null,running=false,generation=0;
 let windowSize=3,reservations=0,nextSeq=1,codec='',closePromise=null,needClose=false,forceJPEG=false;
 let pending=new Map(),statsTimer=null,statsTime=0,frames=0,bytes=0,acks=0,rtt=0,bufferMs=0,captureMode='';
-let encoderGeneration=0;
+let encoderGeneration=0,avcInitSent=false,latestFrame=null;
 let encodedWidth=0,encodedHeight=0;
 let openingPromise=null,connectTimer=null;
 let audioSender=null;
@@ -37,6 +37,20 @@ let auxiliaryAudio=null,pendingAudioSender=null,selectingAudio=false;
 let nativeSender=null;
 const captureAudioOptions={echoCancellation:false,noiseSuppression:false,autoGainControl:false,
  suppressLocalAudioPlayback:true,restrictOwnAudio:false};
+function clearLatest(){if(latestFrame){latestFrame.close();latestFrame=null;}}
+const preview=$('preview'),previewDetails=preview&&preview.closest?preview.closest('details'):null;
+function syncPreview(){
+ if(!preview)return;
+ const needVideo=!!stream&&(typeof MediaStreamTrackProcessor!=='function'||(previewDetails&&previewDetails.open));
+ if(needVideo){
+  preview.hidden=false;
+  if(preview.srcObject!==stream){preview.srcObject=stream;if(preview.play)preview.play().catch(()=>{});}
+ }else{
+  if(preview.pause)try{preview.pause();}catch(ignored){}
+  preview.srcObject=null;preview.hidden=true;
+ }
+}
+if(previewDetails&&previewDetails.addEventListener)previewDetails.addEventListener('toggle',syncPreview);
 function audioOptions(onStop){const voice=$('audio-quality').value==='voice';return {channels:voice?1:2,bitrate:voice?64000:128000,onStop};}
 function audioStatus(text){$('audio-status').textContent=text;}
 function stopTracks(captured){if(captured)captured.getTracks().forEach(track=>track.stop());}
@@ -65,7 +79,7 @@ else if(!supported){
  else if(!config.https_url){$('secure-link').hidden=true;$('secure-note').textContent='Per condividere è necessario configurare HTTPS sul servizio.';}
  message('Condivisione non disponibile in questa pagina.');
 }else{$('start').disabled=false;message('Premi Condividi e scegli cosa mostrare sulla TV.');}
-function destroyWorker(){encoderGeneration++;if(worker){worker.terminate();worker=null;}reservations=0;pending.clear();}
+function destroyWorker(){encoderGeneration++;avcInitSent=false;clearLatest();if(worker){worker.terminate();worker=null;}reservations=0;pending.clear();}
 function stop(text,keepalive=false){
  const close=needClose;needClose=false;generation++;running=false;clearInterval(statsTimer);clearTimeout(connectTimer);destroyWorker();
  if(nativeSender){
@@ -79,6 +93,7 @@ function stop(text,keepalive=false){
  if(reader){reader.cancel().catch(()=>{});reader=null;}
  if(stream){stream.getTracks().forEach(track=>{track.onended=null;track.stop();});stream=null;}
  if(socket){socket.onclose=socket.onerror=socket.onmessage=null;socket.close();socket=null;}
+ if($('preview').pause)try{$('preview').pause();}catch(ignored){}
  $('preview').srcObject=null;$('preview').hidden=true;$('stop').disabled=true;
  $('open-tv').disabled=!config.available;
  $('width').disabled=$('fps').disabled=$('transport').disabled=$('video-profile').disabled=false;
@@ -94,18 +109,32 @@ function stop(text,keepalive=false){
 function packet(data){
  if(!socket||socket.readyState!==WebSocket.OPEN)return;
  if(pending.size>=windowSize){stop('Ricevitore congestionato. Riprova con una larghezza inferiore.');return;}
- const content=data.data,buffer=new ArrayBuffer(32+content.byteLength),view=new DataView(buffer);
- new Uint8Array(buffer).set([83,86,50,0]);view.setUint8(4,data.kind);view.setUint8(5,data.key?1:0);
+ const content=data.data;
+ const zeroCopy=content.byteOffset===32&&content.buffer.byteLength===32+content.byteLength;
+ const buffer=zeroCopy?content.buffer:new ArrayBuffer(32+content.byteLength);
+ const view=new DataView(buffer);
+ view.setUint32(0,0x53563200);view.setUint8(4,data.kind);view.setUint8(5,data.key?1:0);
  const count=data.kind===1?0:(data.count||1);view.setUint16(6,count);
  const seq=nextSeq++;view.setUint32(8,seq);view.setUint16(12,data.width);view.setUint16(14,data.height);
  data.rect.forEach((value,index)=>view.setUint16(16+index*2,value));
- new Uint8Array(buffer,32).set(content);
+ if(!zeroCopy)new Uint8Array(buffer,32).set(content);
+ if(data.kind===1)avcInitSent=true;
  pending.set(seq,{sent:performance.now(),kind:data.kind,count});bytes+=buffer.byteLength;socket.send(buffer);
 }
 function effectiveFPS(mode){return Math.min(Number($('fps').value),mode==='h264'?60:30);}
 function paceCapture(){
  const track=stream&&stream.getVideoTracks()[0];
  if(track&&track.applyConstraints)track.applyConstraints({frameRate:{ideal:effectiveFPS(codec),max:effectiveFPS(codec)}}).catch(()=>{});
+}
+function canSendFrame(){
+ const credits=codec==='h264'&&!avcInitSent?Math.max(1,windowSize-1):windowSize;
+ return !!(running&&worker&&reservations<1&&pending.size+reservations<credits&&socket&&socket.readyState===WebSocket.OPEN&&socket.bufferedAmount<=512*1024);
+}
+function drainLatest(){
+ if(latestFrame&&canSendFrame()){
+  const next=latestFrame;latestFrame=null;
+  reservations++;worker.postMessage({type:'frame',frame:next},[next]);
+ }
 }
 function beginEncoding(capabilities){
  if(!running)return;destroyWorker();
@@ -117,10 +146,10 @@ function beginEncoding(capabilities){
   if(currentGeneration!==generation||currentEncoder!==encoderGeneration||!running)return;
   const data=event.data;
   if(data.type==='configure'){
-   encodedWidth=data.width;encodedHeight=data.height;
+   avcInitSent=false;encodedWidth=data.width;encodedHeight=data.height;
    codec=data.codec;pending.clear();socket.send(JSON.stringify(data));
   }else if(data.type==='packet')packet(data);
-  else if(data.type==='processed')reservations=Math.max(0,reservations-1);
+  else if(data.type==='processed'){reservations=Math.max(0,reservations-1);drainLatest();}
   else if(data.type==='mode'){codec=data.mode;paceCapture();}
  };
  worker.onerror=()=>stop('Codifica non disponibile nel browser. Ricarica la pagina.');
@@ -129,11 +158,12 @@ function beginEncoding(capabilities){
  message((codec==='h264'?'Video H.264':'Immagini adattive')+' · collegamento alla TV…');
 }
 function push(frame){
- // AVC may emit an init packet plus media from one output callback. Images
- // produce exactly one packet, so can use the whole bounded network window.
- const credits=codec==='h264'?windowSize-1:windowSize;
- if(!running||!worker||reservations>=1||pending.size+reservations>=credits||socket.bufferedAmount>512*1024){frame.close();return;}
- reservations++;worker.postMessage({type:'frame',frame},[frame]);
+ if(!running||!worker){frame.close();return;}
+ if(canSendFrame()){
+  clearLatest();reservations++;worker.postMessage({type:'frame',frame},[frame]);
+ }else{
+  clearLatest();latestFrame=frame;
+ }
 }
 async function readFrames(epoch){
  if(typeof MediaStreamTrackProcessor==='function'){
@@ -156,7 +186,7 @@ async function readFrames(epoch){
  }
 }
 function updateStats(){
- if(!running||document.hidden)return;const now=performance.now(),elapsed=(now-statsTime)/1000;
+ if(!running||document.hidden)return;const now=performance.now(),elapsed=Math.max(.001,(now-statsTime)/1000);
  if(pending.size&&now-Math.min(...[...pending.values()].map(item=>item.sent))>10000){stop('La TV non risponde. Riprova la condivisione.');return;}
  if(!worker)return;
  message((codec==='h264'?'H.264':'Immagini adattive')+' · '+encodedWidth+'×'+encodedHeight+' · '+(frames/elapsed).toFixed(1)+' immagini/s ricevute · '+(bytes*8/elapsed/1000000).toFixed(2)+' Mb/s video · conferma TV '+Math.round(acks?rtt/acks:0)+' ms'+(codec==='h264'?' · buffer '+Math.round(bufferMs)+' ms':'')+captureMode);
@@ -184,7 +214,10 @@ $('start').onclick=async()=>{
   $('audio-enabled').disabled=$('audio-quality').disabled=true;
   $('select-audio').disabled=false;
   if(audioSender)audioSender.start(stream.getAudioTracks()[0],track.getSettings().displaySurface);
-  $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
+  if(typeof MediaStreamTrackProcessor!=='function'){
+   if(previewDetails)previewDetails.open=true;
+   $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
+  }else syncPreview();
   if(nativeMode){
    needClose=false;running=true;$('select-audio').disabled=true;$('open-tv').disabled=true;
    $('tv-status').textContent='Avvio del lettore video nativo della TV; il browser della TV non è necessario.';
@@ -212,6 +245,7 @@ $('start').onclick=async()=>{
     const sent=pending.get(data.seq);if(!sent)return;
     const delay=performance.now()-sent.sent;pending.delete(data.seq);acks++;rtt+=delay;bufferMs=data.bufferMs||0;
     frames+=sent.count;if(worker)worker.postMessage({type:'feedback',rtt:delay,bufferMs,decodeMs:data.decodeMs});
+    drainLatest();
    }
   };
   socket.onerror=()=>stop('Collegamento al Raspberry non riuscito.');

@@ -53,6 +53,16 @@ except OSError:
     pass
 
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
+    def setup(self):
+        super().setup()
+        try:
+            self.connection.settimeout(15)
+            self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except OSError:
+            pass
+
     def log_message(self, *_):
         pass
 
@@ -179,7 +189,8 @@ class Handler(BaseHTTPRequestHandler):
                 if session.closed:self.send_error(410);return
             except ValueError:self.send_error(404);return
             self.send_response(200);self.send_header('Content-Type','video/mpeg')
-            self.send_header('Connection','close');self.end_headers();return
+            self.send_header('Content-Length','0')
+            self.send_header('Connection','close');self.close_connection=True;self.end_headers();return
         self.send_error(404)
 
     def native_post(self):

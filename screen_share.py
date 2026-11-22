@@ -3,6 +3,7 @@ import asyncio
 import json
 import re
 import secrets
+import socket
 import threading
 import struct
 import time
@@ -16,6 +17,9 @@ MAX_FRAME = 512 * 1024
 WINDOW = 3
 MAX_WIDTH, MAX_HEIGHT = 1920, 1080
 MAX_TILES = ((MAX_WIDTH+63)//64)*((MAX_HEIGHT+63)//64)
+_HEADER = struct.Struct('!4sBBHI6HII')
+_UINT16 = struct.Struct('!H')
+_TILE = struct.Struct('!HH')
 
 
 class ShareRelay:
@@ -56,8 +60,8 @@ class ShareRelay:
             self.stop_event = asyncio.Event()
             try:
                 async with AsyncExitStack() as stack:
-                    options = dict(max_size=MAX_FRAME, max_queue=1, compression=None,
-                                   write_limit=32768, ping_interval=10, ping_timeout=10,
+                    options = dict(max_size=MAX_FRAME, max_queue=WINDOW + 1, compression=None,
+                                   write_limit=262144, ping_interval=10, ping_timeout=10,
                                    close_timeout=1)
                     listener = await stack.enter_async_context(serve(self.handle, host, port, **options))
                     self.port = listener.sockets[0].getsockname()[1]
@@ -157,31 +161,31 @@ class ShareRelay:
                     continue
                 if len(message) < 32 or message[:4] != b'SV2\0':
                     return await ws.close(1008, 'Pacchetto video non valido')
-                _, kind, flags, count, seq, fw, fh, x, y, w, h, _, _ = struct.unpack_from('!4sBBHI6HII', message)
+                _, kind, flags, count, seq, fw, fh, x, y, w, h, _, _ = _HEADER.unpack_from(message)
                 if count > 60:
                     return await ws.close(1008, 'Numero campioni non valido')
                 if kind not in (1, 2, 4, 5, 6, 7) or not (2 <= fw <= MAX_WIDTH and 2 <= fh <= MAX_HEIGHT):
                     return await ws.close(1008, 'Formato o dimensioni non validi')
+                view = memoryview(message)
                 if kind == 4 and (not w or not h or x+w > fw or y+h > fh or
-                                  message[32:34] != b'\xff\xd8' or message[-2:] != b'\xff\xd9'):
+                                  view[32:34] != b'\xff\xd8' or view[-2:] != b'\xff\xd9'):
                     return await ws.close(1008, 'Rettangolo JPEG non valido')
                 if kind == 7 and (not w or not h or x+w > fw or y+h > fh or
-                        message[32:40]!=b'\x89PNG\r\n\x1a\n' or message[-12:]!=b'\0\0\0\0IEND\xaeB`\x82'):
-                    return await ws.close(1008,'Rettangolo PNG non valido')
-                if kind in (5,6):
-                    if len(message)<36:
-                        return await ws.close(1008,'Atlante non valido')
-                    tiles=struct.unpack_from('!H',message,32)[0]
-                    offset=34+tiles*4
-                    if (not 1<=tiles<=MAX_TILES or not 1<=x<=8 or y!=64 or w!=x*64 or
-                            h!=((tiles+x-1)//x)*64 or len(message)<offset+4 or
-                            (kind==5 and (message[offset:offset+2]!=b'\xff\xd8' or message[-2:]!=b'\xff\xd9')) or
-                            (kind==6 and (message[offset:offset+8]!=b'\x89PNG\r\n\x1a\n' or message[-12:]!=b'\0\0\0\0IEND\xaeB`\x82'))):
-                        return await ws.close(1008,'Atlante immagine non valido')
-                    for index in range(tiles):
-                        tx,ty=struct.unpack_from('!HH',message,34+index*4)
-                        if tx>=fw or ty>=fh or tx%64 or ty%64:
-                            return await ws.close(1008,'Coordinate atlante non valide')
+                        view[32:40] != b'\x89PNG\r\n\x1a\n' or view[-12:] != b'\0\0\0\0IEND\xaeB`\x82'):
+                    return await ws.close(1008, 'Rettangolo PNG non valido')
+                if kind in (5, 6):
+                    if len(message) < 36:
+                        return await ws.close(1008, 'Atlante non valido')
+                    tiles = _UINT16.unpack_from(view, 32)[0]
+                    offset = 34 + tiles * 4
+                    if (not 1 <= tiles <= MAX_TILES or not 1 <= x <= 8 or y != 64 or w != x * 64 or
+                            h != ((tiles + x - 1) // x) * 64 or len(message) < offset + 4 or
+                            (kind == 5 and (view[offset:offset+2] != b'\xff\xd8' or view[-2:] != b'\xff\xd9')) or
+                            (kind == 6 and (view[offset:offset+8] != b'\x89PNG\r\n\x1a\n' or view[-12:] != b'\0\0\0\0IEND\xaeB`\x82'))):
+                        return await ws.close(1008, 'Atlante immagine non valido')
+                    for tx, ty in _TILE.iter_unpack(view[34:offset]):
+                        if tx >= fw or ty >= fh or tx % 64 or ty % 64:
+                            return await ws.close(1008, 'Coordinate atlante non valide')
                 if viewer is None or self.viewer_protocol != 2:
                     self.inflight.clear()
                     await ws.send('{"type":"waiting"}')
@@ -257,6 +261,12 @@ class ShareRelay:
         try:
             if not self.valid_request(ws):
                 return await ws.close(1008, 'Origine o indirizzo non consentito')
+            sock = ws.transport.get_extra_info('socket') if ws.transport else None
+            if sock is not None:
+                try:
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                except OSError:
+                    pass
             try:
                 hello = json.loads(await asyncio.wait_for(ws.recv(), 5))
                 if not isinstance(hello, dict):

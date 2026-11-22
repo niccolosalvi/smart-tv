@@ -37,5 +37,33 @@
   let moof=make(0);moof=make(moof.length+8);
   return join(moof,box('mdat',data));
  }
- scope.ScreenMP4={init,fragment};
+ function fragmentBatch(sequence,samples){
+  if(!samples||!samples.length)return new Uint8Array(0);
+  if(samples.length===1){const s=samples[0];return fragment(sequence,s.timestamp,s.duration,s.data,s.key);}
+  const mfhd=full('mfhd',0,0,u32(sequence));
+  const tfhd=full('tfhd',0,0x020000,u32(1));
+  const ticks=Math.max(0,Math.round(samples[0].timestamp*.09));
+  const tfdt=ticks<4294967296?full('tfdt',0,0,u32(ticks)):full('tfdt',1,0,u64(ticks));
+  const entries=new Uint8Array(samples.length*12),ev=new DataView(entries.buffer);
+  let dataTotal=0;
+  for(let i=0;i<samples.length;i++){
+   const s=samples[i],base=i*12;
+   ev.setUint32(base,Math.max(1,Math.round(s.duration*.09)));
+   ev.setUint32(base+4,s.data.length);
+   ev.setUint32(base+8,s.key?0x02000000:0x01010000);
+   dataTotal+=s.data.length;
+  }
+  const sampleCount=u32(samples.length);
+  function make(offset){return box('moof',mfhd,box('traf',tfhd,tfdt,full('trun',0,0x000701,sampleCount,u32(offset),entries)));}
+  let moof=make(0);moof=make(moof.length+8);
+  const out=new Uint8Array(moof.length+8+dataTotal);
+  out.set(moof,0);
+  const mv=new DataView(out.buffer);
+  mv.setUint32(moof.length,dataTotal+8);
+  out.set(text('mdat'),moof.length+4);
+  let cursor=moof.length+8;
+  for(const s of samples){out.set(s.data,cursor);cursor+=s.data.length;}
+  return out;
+ }
+ scope.ScreenMP4={init,fragment,fragmentBatch};
 })(typeof self!=='undefined'?self:globalThis);
