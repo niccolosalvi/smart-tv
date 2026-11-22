@@ -22,9 +22,21 @@ class ViewStateTests(unittest.TestCase):
         self.assertEqual(self.view.after_failure({'app': 'netflix'})['source'], 'unknown')
 
     def test_external_navigation_invalidates_context(self):
-        for key in ('KEY_HOME', 'KEY_SOURCE', 'KEY_RETURN', 'KEY_EXIT'):
+        for key in ('KEY_HOME', 'KEY_SOURCE', 'KEY_EXIT'):
             self.view.select('netflix')
             self.assertEqual(self.view.after_command({'key': key})['source'], 'unknown')
+        self.view.select('screen')
+        self.assertEqual(self.view.after_command({'key': 'KEY_RETURN'})['source'], 'unknown')
+
+    def test_return_preserves_streaming_app_views(self):
+        for source in ('netflix', 'youtube', 'primevideo'):
+            before = self.view.after_command({'app': source})
+            after = self.view.after_command({'key': 'KEY_RETURN'})
+            self.assertEqual((after['source'], after['basis'], after['revision']),
+                             (before['source'], before['basis'], before['revision']))
+            failed = self.view.after_failure({'key': 'KEY_RETURN'})
+            self.assertEqual((failed['source'], failed['basis'], failed['revision']),
+                             (before['source'], before['basis'], before['revision']))
 
     def test_restored_context_is_labelled_as_saved(self):
         self.view.after_command({'app': 'youtube'})

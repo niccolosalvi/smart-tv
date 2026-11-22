@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SOURCES = {'unknown', 'tv', 'youtube', 'netflix', 'primevideo', 'pc', 'screen'}
+APP_VIEWS = {'youtube', 'netflix', 'primevideo'}
 NAVIGATION = {'KEY_HOME', 'KEY_SOURCE', 'KEY_RETURN', 'KEY_EXIT'}
 
 class ViewState:
@@ -67,10 +68,18 @@ class ViewState:
         if payload.get('key') in {'KEY_CHUP', 'KEY_CHDOWN'}:
             return self.select('tv', 'last_request')
         if payload.get('key') in NAVIGATION:
-            return self.select('unknown', 'unconfirmed')
+            with self.lock:
+                if payload.get('key') == 'KEY_RETURN' and self.state['source'] in APP_VIEWS:
+                    return self.get()
+                return self.select('unknown', 'unconfirmed')
         return self.get()
 
     def after_failure(self, payload):
+        if payload.get('key') == 'KEY_RETURN':
+            with self.lock:
+                if self.state['source'] in APP_VIEWS:
+                    return self.get()
+                return self.select('unknown', 'unconfirmed')
         if 'youtube_search' in payload or 'screen' in payload or 'power' in payload or 'app' in payload or 'source' in payload or 'channel' in payload or payload.get('key') in NAVIGATION | {'KEY_TV', 'KEY_HDMI1', 'KEY_CHUP', 'KEY_CHDOWN'}:
             return self.select('unknown', 'unconfirmed')
         return self.get()

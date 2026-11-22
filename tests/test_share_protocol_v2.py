@@ -76,6 +76,29 @@ class ProtocolV2Tests(unittest.TestCase):
         sender.send(value+struct.pack('!HHH',1,640,0)+b'\xff\xd8data\xff\xd9')
         with self.assertRaises(ConnectionClosed):sender.recv(timeout=2)
 
+    def test_full_hd_config_and_large_tile_atlas_remain_bounded(self):
+        viewer,_=self.peer('viewer');sender,_=self.peer('sender')
+        config={'type':'configure','codec':'jpeg','width':1920,'height':1080}
+        sender.send(json.dumps(config));self.assertEqual(json.loads(viewer.recv(timeout=2)),config)
+        tiles=[(x,y) for y in range(0,1080,64) for x in range(0,1920,64)][:241]
+        atlas=struct.pack('!H',len(tiles))+b''.join(struct.pack('!HH',*tile) for tile in tiles)+b'\xff\xd8data\xff\xd9'
+        value=struct.pack('!4sBBHI6HII',b'SV2\0',5,0,1,1,1920,1080,8,64,512,1984,0,0)+atlas
+        sender.send(value);self.assertEqual(viewer.recv(timeout=2),value)
+        viewer.send(json.dumps({'type':'ack','seq':1,'decodeMs':21.5}))
+        self.assertEqual(json.loads(sender.recv(timeout=2))['decodeMs'],21.5)
+        self.assertEqual(self.relay.metrics['decode_ms'],21.5)
+
+    def test_dimensions_beyond_full_hd_are_rejected(self):
+        self.peer('viewer');sender,_=self.peer('sender')
+        sender.send(json.dumps({'type':'configure','codec':'jpeg','width':1922,'height':1080}))
+        with self.assertRaises(ConnectionClosed):sender.recv(timeout=2)
+
+    def test_invalid_receiver_decode_measurement_is_rejected(self):
+        viewer,_=self.peer('viewer');sender,_=self.peer('sender')
+        sender.send(packet(1));viewer.recv(timeout=2)
+        viewer.send(json.dumps({'type':'ack','seq':1,'decodeMs':float('nan')}))
+        with self.assertRaises(ConnectionClosed):viewer.recv(timeout=2)
+
     def test_avc_append_timeout_falls_back_without_disconnecting_viewer(self):
         viewer,_=self.peer('viewer');sender,_=self.peer('sender')
         sender.send(json.dumps({'type':'configure','codec':'h264','width':640,'height':360,'mime':'video/mp4; codecs="avc1.42E01F"'}))

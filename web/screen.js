@@ -39,6 +39,7 @@
  function acknowledge(item){
   if(!item)return;if(item.legacy){send('ack');return;}
   var result={type:'ack',seq:item.seq,bufferMs:codec==='h264'?Math.min(60000,Math.round(bufferMs())):0};
+  if(typeof item.decodeMs==='number')result.decodeMs=item.decodeMs;
   if(codec==='h264'&&Date.now()-lastVideoStats>1000){
    lastVideoStats=Date.now();result.videoWidth=video.videoWidth||0;result.playedSeconds=video.currentTime||0;result.paused=video.paused;
    try{var quality=video.getVideoPlaybackQuality?video.getVideoPlaybackQuality():null;
@@ -66,12 +67,14 @@
    if(current||!queue.length)return;
    current=queue.shift();var item=current,generation=epoch;
    revokeImage();imageURL=URLApi.createObjectURL(new Blob([item.payload],{type:item.mime||'image/jpeg'}));
+   var decodeStarted=Date.now();
    image.onload=function(){if(generation!==epoch)return;
     if(item.legacy)image.style.display='block';else{
      if(item.tiles){for(var i=0;i<item.tiles.length;i++){var tx=item.tiles[i][0],ty=item.tiles[i][1],tw=Math.min(64,canvas.width-tx),th=Math.min(64,canvas.height-ty);ctx.drawImage(image,(i%item.columns)*64,Math.floor(i/item.columns)*64,tw,th,tx,ty,tw,th);}}
      else ctx.drawImage(image,item.x,item.y,item.w,item.h);
      canvas.style.display='block';
     }
+    item.decodeMs=Math.max(0,Date.now()-decodeStarted);
     panel.style.display='none';revokeImage();acknowledge(item);current=null;pump();
    };
    image.onerror=function(){show('Immagine non riproducibile.');if(socket)socket.close(1000,'Decoder JPEG non disponibile');};image.src=imageURL;

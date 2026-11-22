@@ -194,6 +194,20 @@ class Remote:
                 record('screen:open', started, 'error', error_type=type(exc).__name__)
                 raise RuntimeError(type(exc).__name__) from None
 
+    def open_native_receiver(self, url):
+        import re
+        target=urlsplit(url)
+        try:
+            address=ipaddress.IPv4Address(target.hostname)
+            if (target.scheme!='http' or not target.port or target.username or target.password or
+                target.query or target.fragment or address.is_loopback or address.is_unspecified or
+                address.is_multicast or not re.fullmatch(r'/native/[A-Za-z0-9_-]{32}/stream\.ts',target.path)):
+                raise ValueError()
+        except (ValueError,TypeError):raise ValueError('Indirizzo video nativo non valido') from None
+        with self.lock:
+            if not self.tv.is_alive():self.connect()
+            self.tv.run_app('SmartTVRx1.Receiver','DEEP_LINK',json.dumps({'url':url}))
+
     def launch_app(self, app):
         if not isinstance(app, str) or app not in APPS:
             raise ValueError('App non consentita')

@@ -14,6 +14,8 @@ from audio_share import AudioRelay
 
 MAX_FRAME = 512 * 1024
 WINDOW = 3
+MAX_WIDTH, MAX_HEIGHT = 1920, 1080
+MAX_TILES = ((MAX_WIDTH+63)//64)*((MAX_HEIGHT+63)//64)
 
 
 class ShareRelay:
@@ -24,6 +26,8 @@ class ShareRelay:
         self.ack_timeout = ack_timeout
         self.port = None
         self.secure_port = None
+        self.extra_secure_port = None
+        self.extra_https_port = None
         self.sender = self.viewer = self.ack = None
         self.viewer_info = {}
         self.sender_protocol = self.viewer_protocol = 1
@@ -35,15 +39,18 @@ class ShareRelay:
         self.error = None
         self.ready = threading.Event()
 
-    def start(self, host='0.0.0.0', port=8767, ssl_context=None, secure_port=8768):
-        self.thread = threading.Thread(target=self._run, args=(host, port, ssl_context, secure_port), daemon=True)
+    def start(self, host='0.0.0.0', port=8767, ssl_context=None, secure_port=8768,
+              extra_ssl_context=None, extra_secure_port=8770, extra_https_port=8769):
+        self.extra_https_port = extra_https_port if extra_ssl_context else None
+        self.thread = threading.Thread(target=self._run, args=(host, port, ssl_context, secure_port,
+            extra_ssl_context, extra_secure_port), daemon=True)
         self.thread.start()
         if not self.ready.wait(5):
             raise RuntimeError('Avvio relay schermo scaduto')
         if self.error:
             raise RuntimeError('Relay schermo non disponibile') from self.error
 
-    def _run(self, host, port, ssl_context, secure_port):
+    def _run(self, host, port, ssl_context, secure_port, extra_ssl_context, extra_secure_port):
         async def run():
             self.loop = asyncio.get_running_loop()
             self.stop_event = asyncio.Event()
@@ -58,6 +65,10 @@ class ShareRelay:
                         secure = await stack.enter_async_context(serve(
                             self.handle, host, secure_port, ssl=ssl_context, **options))
                         self.secure_port = secure.sockets[0].getsockname()[1]
+                    if extra_ssl_context is not None:
+                        extra = await stack.enter_async_context(serve(
+                            self.handle, host, extra_secure_port, ssl=extra_ssl_context, **options))
+                        self.extra_secure_port = extra.sockets[0].getsockname()[1]
                     self.ready.set()
                     await self.stop_event.wait()
             except Exception as exc:
@@ -77,7 +88,8 @@ class ShareRelay:
         expected_host = f'[{address}]:{port}' if ':' in address else f'{address}:{port}'
         origin = ws.request.headers.get('Origin', '')
         secure = ws.transport.get_extra_info('ssl_object') is not None
-        dashboard = (f'https://{address}:{self.https_port}' if secure else
+        https_port = self.extra_https_port if port == self.extra_secure_port else self.https_port
+        dashboard = (f'https://{address}:{https_port}' if secure else
                      f'http://{address}:{self.http_port}')
         local_sender = re.fullmatch(r'http://(?:127\.0\.0\.1|localhost):[0-9]{1,5}', origin)
         return (ws.request.path == '/screen' and
@@ -132,7 +144,7 @@ class ShareRelay:
                             raise ValueError()
                         if not all(type(data.get(k)) is int for k in ('width', 'height')):
                             raise ValueError()
-                        if not (2 <= data['width'] <= 1280 and 2 <= data['height'] <= 720):
+                        if not (2 <= data['width'] <= MAX_WIDTH and 2 <= data['height'] <= MAX_HEIGHT):
                             raise ValueError()
                         if data['codec'] == 'h264' and not re.fullmatch(r'video/mp4; codecs="avc1\.[0-9A-Fa-f]{6}"', data.get('mime', '')):
                             raise ValueError()
@@ -148,7 +160,7 @@ class ShareRelay:
                 _, kind, flags, count, seq, fw, fh, x, y, w, h, _, _ = struct.unpack_from('!4sBBHI6HII', message)
                 if count > 60:
                     return await ws.close(1008, 'Numero campioni non valido')
-                if kind not in (1, 2, 4, 5, 6, 7) or not (2 <= fw <= 1280 and 2 <= fh <= 720):
+                if kind not in (1, 2, 4, 5, 6, 7) or not (2 <= fw <= MAX_WIDTH and 2 <= fh <= MAX_HEIGHT):
                     return await ws.close(1008, 'Formato o dimensioni non validi')
                 if kind == 4 and (not w or not h or x+w > fw or y+h > fh or
                                   message[32:34] != b'\xff\xd8' or message[-2:] != b'\xff\xd9'):
@@ -161,7 +173,7 @@ class ShareRelay:
                         return await ws.close(1008,'Atlante non valido')
                     tiles=struct.unpack_from('!H',message,32)[0]
                     offset=34+tiles*4
-                    if (not 1<=tiles<=240 or not 1<=x<=8 or y!=64 or w!=x*64 or
+                    if (not 1<=tiles<=MAX_TILES or not 1<=x<=8 or y!=64 or w!=x*64 or
                             h!=((tiles+x-1)//x)*64 or len(message)<offset+4 or
                             (kind==5 and (message[offset:offset+2]!=b'\xff\xd8' or message[-2:]!=b'\xff\xd9')) or
                             (kind==6 and (message[offset:offset+8]!=b'\x89PNG\r\n\x1a\n' or message[-12:]!=b'\0\0\0\0IEND\xaeB`\x82'))):
@@ -214,6 +226,11 @@ class ShareRelay:
                         self.metrics['paused']=data['paused']
                     reply = {'type': 'ack', 'seq': data['seq'],
                              'bufferMs': self.metrics['buffer_ms'], 'ackMs': self.metrics['ack_ms']}
+                    if 'decodeMs' in data:
+                        decode_ms = data['decodeMs']
+                        if type(decode_ms) not in (int, float) or not 0 <= decode_ms <= 60000:
+                            raise ValueError()
+                        self.metrics['decode_ms'] = reply['decodeMs'] = round(decode_ms, 1)
                 elif data.get('type') == 'fallback':
                     self.inflight.clear()
                     agent = self.viewer_info.get('userAgent')

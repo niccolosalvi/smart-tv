@@ -12,6 +12,10 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:20px}
 #back{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);text-decoration:none;font-size:12.5px;color:var(--text-2);background:var(--surface)}
 #back:hover{background:var(--surface-2);color:var(--white)}
+#remote-view iframe{width:100%;height:calc(100dvh - 180px);min-height:420px;border:0;display:block;background:var(--bg)}
+#remote-view .note{margin:8px 0}
+.remote-mode #preview-panel{position:fixed;bottom:0;left:0;width:2px;height:2px;overflow:hidden;margin:0;padding:0;border:0;pointer-events:none}
+.remote-mode #preview-panel video{width:2px;height:2px;margin:0;border:0}
 .brand{font-weight:650;letter-spacing:-.5px;font-size:17px;color:var(--white)}.brand span{color:var(--dim)}
 h1{font-size:24px;letter-spacing:-.6px;margin:0 0 6px;font-weight:650}
 .lead{margin:0 0 20px;color:var(--muted);line-height:1.55;max-width:66ch}
@@ -54,7 +58,9 @@ video{width:100%;max-height:400px;background:#000;border-radius:var(--r-sm);bord
 }
 @media(max-width:420px){.fields{grid-template-columns:1fr}}
 </style></head><body><main>
-<header class="top"><a href="#" id="back">← Telecomando</a><span class="brand" aria-hidden="true">Salotto<span>.</span></span></header><h1>Condividi lo schermo</h1>
+<header class="top"><a href="#telecomando" id="back">← Telecomando</a><button id="remote-stop" hidden disabled>Interrompi</button><span class="brand" aria-hidden="true">Salotto<span>.</span></span></header>
+<section id="remote-view" hidden aria-label="Telecomando durante la condivisione"><p id="remote-status" class="status" role="status" aria-live="polite"></p><p class="note">Puoi usare il telecomando qui senza interrompere la condivisione. Uscendo da Safari, iOS può sospendere la trasmissione.</p><iframe id="remote-frame" title="Telecomando TV"></iframe></section>
+<div id="share-view"><h1>Condividi lo schermo</h1>
 <p class="lead">Con la TV accesa, premi «Condividi» e scegli lo schermo, una finestra o una scheda. Il ricevitore sulla TV si apre automaticamente.</p>
 <div class="grid"><section class="sect" aria-label="Avvio della condivisione"><h2>Avvio</h2><div><button id="open-tv" disabled>Apri sulla TV</button></div>
 <p id="tv-status" role="status" aria-live="polite">Il browser della TV verrà aperto sulla pagina ricevente.</p>
@@ -62,10 +68,11 @@ video{width:100%;max-height:400px;background:#000;border-radius:var(--r-sm);bord
 <div id="launch" hidden><p id="secure-note">Per condividere lo schermo apri la versione HTTPS del telecomando.</p><p><a id="secure-link">Apri condivisione sicura</a></p></div>
 <div class="actions"><button id="start" disabled>Condividi</button><button id="stop" disabled>Interrompi</button></div>
 <p id="status" class="status" role="status" aria-live="polite">Verifica del browser…</p>
-</section><div><section class="sect" aria-label="Impostazioni video"><h2>Video</h2><div class="fields"><label class="field">Larghezza massima <select id="width"><option value="640">640 px</option><option value="960">960 px</option><option value="1280" selected>1280 px</option></select></label>
-<label class="field">Immagini al secondo <select id="fps"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="30" selected>30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option></select></label>
-<label class="field wide">Modalità <select id="transport"><option value="auto">Automatica</option><option value="jpeg">Compatibile · immagini adattive</option></select></label>
-</div><p class="note">La frequenza scelta è un limite richiesto. Il percorso video usa fino a 60 immagini/s; quello compatibile fino a 30, adattandosi al ricevitore.</p>
+</section><div><section class="sect" aria-label="Impostazioni video"><h2>Video</h2><div class="fields"><label class="field wide">Contenuto <select id="video-profile"><option value="cinema" selected>Film e video — qualità elevata</option><option value="balanced">Desktop — meno banda</option></select></label>
+<label class="field">Larghezza massima <select id="width"><option value="640">640 px</option><option value="960">960 px</option><option value="1280">1280 px — HD</option><option value="1920" selected>1920 px — Full HD</option></select></label>
+<label class="field">Immagini al secondo <select id="fps"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="24">24</option><option value="25">25</option><option value="30">30</option><option value="60" selected>60</option></select></label>
+<label class="field wide">Modalità <select id="transport"><option value="native" selected>Video nativo TV · fluidità</option><option value="native-app">Ricevitore Tizen · richiede installazione</option><option value="auto">Automatica</option><option value="jpeg">Compatibile · immagini adattive</option></select></label>
+</div><p class="note">Per i film prova 24, 25 o 30 immagini/s secondo il contenuto. Full HD conserva più dettagli ma richiede più banda e può ridurre la fluidità: se noti scatti, torna a 1280 px. Video nativo TV usa il lettore della TV con audio sincronizzato; il lettore integrato può aggiungere 10–12 secondi di ritardo. La frequenza scelta è un limite richiesto; il percorso compatibile usa fino a 30 immagini/s, H.264 fino a 60. La cattura si adegua al limite effettivo.</p>
 </section><section class="sect" aria-label="Impostazioni audio"><h2>Audio</h2><label class="check"><input id="audio-enabled" type="checkbox" checked> Condividi anche l’audio</label>
 <p class="note">L’audio è destinato alla TV: al browser viene richiesto di silenziare la riproduzione locale durante la condivisione e ripristinarla quando termini.</p>
 <label class="field">Qualità audio <select id="audio-quality"><option value="music">Musica e video · stereo</option><option value="voice">Voce · mono, meno banda</option></select></label>
@@ -74,6 +81,6 @@ video{width:100%;max-height:400px;background:#000;border-radius:var(--r-sm);bord
 <p class="note">Se l’audio di sistema non arriva, questo pulsante consente di scegliere una scheda solo per il suono: le immagini restano quelle dello schermo già condiviso.</p>
 <p id="audio-status" role="status" aria-live="polite">Audio pronto, se incluso nella selezione del browser.</p>
 
-</section></div><section class="sect preview-sect" aria-label="Anteprima"><details><summary>Anteprima sul PC</summary><video id="preview" muted autoplay playsinline></video></details><canvas id="capture" hidden></canvas>
-</section></div></main><script type="application/json" id="share-config">__CONFIG__</script>
-<script src="/assets/audio-share.js"></script><script src="/assets/share.js"></script></body></html>
+</section></div></div></div><section id="preview-panel" class="sect preview-sect" aria-label="Anteprima"><details><summary>Anteprima sul dispositivo</summary><video id="preview" muted autoplay playsinline></video></details><canvas id="capture" hidden></canvas>
+</section></main><script type="application/json" id="share-config">__CONFIG__</script>
+<script src="/assets/audio-share.js"></script><script src="/assets/native-share.js"></script><script src="/assets/share.js"></script></body></html>

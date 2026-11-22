@@ -124,6 +124,27 @@ request was sent rather than claiming visual confirmation for every search.
 Failed/uncertain requests are never retried automatically. Restart the server
 after updating the files and reload the dashboard on each device.
 
+### Netflix and Prime Video compatibility
+
+The device-keyboard search is implemented only for YouTube. On the UE49KS7000,
+physical tests on 9 November 2026 did not establish a working search path for
+Netflix or Prime Video:
+
+| App | Request delivery | Observed result on the TV |
+| --- | --- | --- |
+| Prime Video | DIAL search attempts returned HTTP 401 | Search not accepted |
+| Prime Video | Native Samsung text sent to the manually selected search field | Text unchanged (confirmed by the user) |
+| Prime Video | Search URL sent to the installed app via WebSocket DEEP_LINK, including a repeat attempt | No requested search appeared (confirmed by the user) |
+| Netflix | DIAL search URL returned HTTP 201 | Opened the profile picker; after profile selection, repeating it left the Home screen unchanged |
+| Netflix | Native Samsung text sent to the manually selected search field | Text unchanged (confirmed by the user) |
+
+These observations concern this TV/app combination and the tested local control
+paths, not every TV model or all possible vendor integrations. HTTP acceptance
+alone does not establish that an application executed a search. The dashboard
+therefore hides the YouTube search field in Netflix and Prime Video views and
+explains that their searches must be entered on the TV. No non-working search
+buttons, grid calibration, or automatic retry sequences are exposed.
+
 ## Install as a Raspberry Pi service
 
 From a checkout on the Raspberry, run as your ordinary user:
@@ -139,6 +160,31 @@ See [deployment instructions](deploy/README.md) for paths, management and rollba
 
 Use a DHCP reservation on your router to keep the server's address stable.
 Network configuration and SSH credentials are deliberately not included here.
+
+## Native TV video (Full HD / 60 requested images per second)
+
+On the Samsung UE49KS7000, **Video nativo TV** uses the TV's DLNA player instead
+of its old browser decoder. The PC records H.264 and AAC together in a single
+MP4 stream; FFmpeg on the Raspberry only remuxes it, without decoding or encoding.
+Open the trusted HTTPS sharing page in current Chrome/Edge on Windows, choose
+Video nativo TV, 1920 px and 60 images/s, and include the system/tab audio in the
+browser picker. The TV switches to its media player automatically. The selected
+capture rate and measured stream rate are reported separately; neither is a
+measurement of physical panel refresh. Stop releases capture and the native
+transport. The existing browser/JPEG workflow remains available for compatibility.
+The built-in DLNA player showed roughly 10–12 seconds of lag in live tests;
+Full HD/60 requested capture does not imply a 1–3 second screen-to-panel delay.
+The configurable-buffer packaged receiver is prepared in `tv-receiver/` but is
+not installed or hardware-validated. See `tv-receiver/README.md` for signing,
+Developer Mode and the documented four-second AVPlay buffer minimum. Enable
+`SMART_TV_TIZEN_RECEIVER=1` only after installing and validating that application.
+
+Requires the Raspberry OS `ffmpeg` package (`sudo apt-get install --no-install-recommends ffmpeg`)
+and a TV exposing Samsung's local AVTransport service on port 9197. Video data
+uses bounded memory buffers and is not written to disk. Native stream URLs are
+session-specific and accepted only from the configured TV. Upload/control
+requests require the existing browser key and same-origin checks. The old
+localhost launcher retains the browser/JPEG path.
 
 ## PC screen sharing (experimental)
 
@@ -185,11 +231,40 @@ localhost launcher remains available for deployments without HTTPS, but is not
 required by the HTTPS workflow. After a service restart, reload the sharing page
 and reopen the TV receiver to refresh the in-memory access key.
 
-Default selection is **1280 × 720 maximum, 30 images/s requested**. The selector
-retains 5/10/15/30/60/90/120; the video path processes at most 60 images/s and the
+Default selection is **Film e video**, **1280 × 720 maximum, 30 images/s requested**.
+An optional **1920 px / Full HD** setting raises both capture and encoding limits
+to 1920 × 1080. It requires more bandwidth and TV decoding work; use 1280 px if
+the legacy TV browser cannot maintain smooth motion. The selector retains
+5/10/15/24/25/30/60; native playback targets Full HD/60 and adds 24/25 for film and broadcast material;
+the video path processes at most 60 images/s and the
 compatibility path at most 30. A requested value is not a throughput guarantee.
 Capture is limited to the chosen size before processing. The browser still asks
 for screen permission each session.
+
+The film profile starts JPEG encoding at quality 0.90, adapts between 0.78 and
+0.94 during normal operation, and increases the H.264 bitrate budget on receivers
+that support it. Desktop starts at 0.72 and uses less bandwidth. These numbers
+are encoder parameters, not percentages of retained visual quality. Adaptation
+is limited to twice per second and considers the receiver's image decode/draw
+time separately from the queued round-trip time. An oversized image is retried
+at lower quality within the existing 512 KiB packet cap, which can require
+quality below the normal floor. If it still cannot fit it is skipped and the
+next image is forced to refresh the complete frame. Queues remain bounded.
+
+For a repeatable **local decoded-image** comparison (Edge, Node.js and the Python
+Playwright package required), run:
+
+```sh
+python -m tools.benchmark_video_quality --output reports/video-quality.json
+python -m tools.benchmark_video_quality --width 1920 --output reports/video-quality-fullhd.json
+```
+
+Optional `--baseline PATH_TO_OLDER_WORKER.js` adds a comparison with a saved
+previous encoder. The benchmark reconstructs full frames and tile atlases from
+synthetic scenes and reports RGB PSNR and explicitly defined 8×8 luma SSIM,
+payload size, encoding time and frames without updates. It does not measure
+the real TV, film playback fluency, physical presentation or end-to-end latency.
+No network, screen capture or TV commands are used by this benchmark.
 
 ### Shared audio
 

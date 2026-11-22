@@ -23,11 +23,13 @@ from health import Health
 from screen_share import ShareRelay
 from sharing_pages import render_share
 from text_input import validate_query
+from ios_setup import load_profile, setup_page
+from native_video import NativeCast
 
 PAGE = (Path(__file__).parent / 'web' / 'index.html').read_text(encoding='utf-8')
 SCRIPT_ASSETS = {f'/assets/{name}.js': (Path(__file__).parent / 'web' / (name+'.js')).read_text(encoding='utf-8')
                  for name in ('screen', 'share', 'share-worker', 'mp4', 'keyboard',
-                              'audio-share', 'audio-capture', 'audio-worker', 'audio-receiver')}
+                              'audio-share', 'audio-capture', 'audio-worker', 'audio-receiver', 'native-share')}
 ASSETS = {f'/assets/{name}.png': (Path(__file__).parent / 'web' / 'assets' / f'{name}.png').read_bytes()
           for name in ('youtube', 'netflix', 'primevideo')}
 CSRF = secrets.token_urlsafe(32)  # Browser control key, memory only, never TV token.
@@ -39,6 +41,7 @@ view = ViewState(STATE / 'ui-context.json')
 guide = Guide(STATE / 'epg-cache.json')
 health = Health()
 sharing = None
+native_cast = NativeCast(HOST)
 allowed_hosts = {'localhost', '127.0.0.1', *socket.gethostbyname_ex(socket.gethostname())[2]}
 # Raspberry Pi hostname resolution may return loopback only. Find the interface
 # selected for the TV route without transmitting any UDP payload.
@@ -71,20 +74,22 @@ class Handler(BaseHTTPRequestHandler):
         if correlation:
             self.send_header('X-Request-ID', correlation)
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('X-Frame-Options', 'DENY')
+        remote_panel = urlsplit(self.path).path == '/remote-panel'
+        self.send_header('X-Frame-Options', 'SAMEORIGIN' if remote_panel else 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
         share_csp = ''
         if urlsplit(self.path).path in ('/share', '/screen'):
             address = self.connection.getsockname()[0]
             secure = self.scheme() == 'https'
-            port = (sharing.secure_port if secure else sharing.port) if sharing else 8767
+            port = (getattr(self.server, 'wss_port', sharing.secure_port) if secure else sharing.port) if sharing else 8767
             protocol = 'wss' if secure else 'ws'
             share_csp = f"; connect-src 'self' {protocol}://{address}:{port}; img-src 'self' blob: data:; media-src 'self' blob:"
         # The 2016 TV browser cannot be assumed to understand nonce sources.
         # Its receiver uses a static same-origin script, supported by CSP1 too.
         path = urlsplit(self.path).path
         script_policy = "'self'" if path in ('/share', '/screen') or path in SCRIPT_ASSETS else "'nonce-" + CSRF + "'"
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src " + script_policy + "; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" + share_csp)
+        ancestors = "'self'" if remote_panel else "'none'"
+        self.send_header('Content-Security-Policy', "default-src 'self'; script-src " + script_policy + "; style-src 'unsafe-inline'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'" + share_csp)
         self.end_headers()
         try:
             self.wfile.write(body)
@@ -127,7 +132,10 @@ class Handler(BaseHTTPRequestHandler):
         address = self.connection.getsockname()[0]
         http_port = getattr(self.server, 'http_port', self.server.server_port)
         https_port = getattr(self.server, 'https_port', None)
-        port = (sharing.secure_port if secure else sharing.port) if sharing else None
+        ios_port = getattr(self.server, 'ios_https_port', None)
+        if not secure and ios_port and re.search(r'iPhone|iPad|Macintosh.*Mobile', self.headers.get('User-Agent', '')):
+            https_port = ios_port
+        port = (getattr(self.server, 'wss_port', sharing.secure_port) if secure else sharing.port) if sharing else None
         return {'available': port is not None, 'port': port, 'key': CSRF,
                 'server': self.origin(),
                 'receiver_url': f'http://{address}:{http_port}/screen',
@@ -139,11 +147,86 @@ class Handler(BaseHTTPRequestHandler):
                 'transmission': sharing.metrics.copy() if sharing else {},
                 'audio': sharing.audio.snapshot() if sharing else {}}
 
+    def native_stream(self):
+        parts=self.path.split('/')
+        if len(parts)!=4 or parts[3]!='stream.ts':
+            return self.reply(404, {'error':'Risorsa non trovata'})
+        if self.client_address[0] != socket.gethostbyname(native_cast.host):
+            return self.reply(403, {'error':'Flusso riservato alla TV'})
+        try:session=native_cast.get(parts[2])
+        except ValueError:return self.reply(404, {'error':'Sessione video non valida'})
+        if session.closed:return self.reply(410, {'error':'Trasmissione terminata'})
+        self.send_response(200)
+        self.send_header('Content-Type','video/mpeg')
+        self.send_header('Cache-Control','no-store')
+        self.send_header('Connection','close')
+        self.send_header('transferMode.dlna.org','Streaming')
+        self.send_header('contentFeatures.dlna.org','DLNA.ORG_OP=00;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000')
+        self.end_headers();self.close_connection=True;self.connection.settimeout(8)
+        if session.launcher:session.transport='APP_STREAMING'
+        try:
+            for data in session.stream():self.wfile.write(data);self.wfile.flush()
+        except (OSError,RuntimeError):pass
+
+    def do_HEAD(self):
+        if self.path.startswith('/native/') and self.valid_host():
+            parts=self.path.split('/')
+            try:
+                if len(parts)!=4 or parts[3]!='stream.ts':raise ValueError()
+                if self.client_address[0]!=socket.gethostbyname(native_cast.host):
+                    self.send_error(403);return
+                session=native_cast.get(parts[2])
+                if session.closed:self.send_error(410);return
+            except ValueError:self.send_error(404);return
+            self.send_response(200);self.send_header('Content-Type','video/mpeg')
+            self.send_header('Connection','close');self.end_headers();return
+        self.send_error(404)
+
+    def native_post(self):
+        try:
+            length=int(self.headers.get('Content-Length','0'))
+            if not 0<length<=2*1024*1024:raise ValueError('Dimensione video non valida')
+            parts=self.path.split('/')
+            if self.path=='/api/native/start':
+                if length>2048:raise ValueError('Richiesta troppo grande')
+                request=json.loads(self.rfile.read(length))
+                if request not in ({},{'receiver':'tizen'}):raise ValueError('Avvio video non valido')
+                use_app=request.get('receiver')=='tizen'
+                if use_app and os.environ.get('SMART_TV_TIZEN_RECEIVER')!='1':
+                    raise RuntimeError('Il ricevitore Tizen deve essere installato e configurato sulla TV')
+                address=self.connection.getsockname()[0]
+                if ipaddress.ip_address(address).is_loopback:
+                    raise ValueError('Apri la condivisione tramite indirizzo LAN')
+                port=getattr(self.server,'http_port',self.server.server_port)
+                if use_app:session=native_cast.start(f'http://{address}:{port}',launcher=remote.open_native_receiver)
+                else:session=native_cast.start(f'http://{address}:{port}')
+                return self.reply(200, {'id':session.id})
+            if len(parts)!=5 or parts[4] not in ('chunk','stop'):
+                return self.reply(404, {'error':'Risorsa non trovata'})
+            session=native_cast.get(parts[3]);payload=self.rfile.read(length)
+            if len(payload)!=length:raise ValueError('Blocco video incompleto')
+            if parts[4]=='stop':session.close()
+            else:session.feed(payload)
+            return self.reply(200, {'accepted':True})
+        except ValueError as exc:return self.reply(400, {'error':str(exc)})
+        except RuntimeError as exc:return self.reply(409, {'error':str(exc)})
+        except OSError:return self.reply(503, {'error':'Video nativo non disponibile'})
+
     def do_GET(self):
         self.correlation = None
         if not self.valid_host():
             return self.reply(403, {'error': 'Host non consentito'})
-        if self.path == '/':
+        if self.path.startswith('/native/'):
+            return self.native_stream()
+        if self.path.startswith('/api/native/'):
+            if self.headers.get('X-Remote-Key') != CSRF:
+                return self.reply(403, {'error':'Richiesta non autorizzata'})
+            try:
+                session=native_cast.get(self.path.split('/')[3])
+                return self.reply(200, session.snapshot())
+            except ValueError:
+                return self.reply(404, {'error':'Sessione video non valida'})
+        if self.path in ('/', '/remote-panel'):
             link = self.sharing_config()['https_url'] or '/share'
             return self.reply(200, PAGE.replace('__CSRF__', CSRF).replace('__SHARE_URL__', link), 'text/html')
         if self.path in ASSETS:
@@ -151,10 +234,23 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in SCRIPT_ASSETS:
             return self.reply(200, SCRIPT_ASSETS[self.path], 'application/javascript')
         parsed = urlsplit(self.path)
+        if parsed.path in ('/setup/iphone', '/setup/iphone.mobileconfig'):
+            profile = getattr(self.server, 'ios_profile', None)
+            if not profile:
+                return self.reply(404, {'error': 'Configurazione iPhone non disponibile'})
+            if parsed.path == '/setup/iphone.mobileconfig':
+                return self.reply(200, profile[0], 'application/x-apple-aspen-config')
+            address = self.connection.getsockname()[0]
+            secure_url = f'https://{address}:{self.server.ios_https_port}/share'
+            return self.reply(200, setup_page(profile[1], profile[2], secure_url), 'text/html')
         if parsed.path in ('/share', '/screen', '/api/share'):
             config = self.sharing_config()
             if parsed.path == '/api/share':
+                config['native_available'] = native_cast.available
+                config['tizen_receiver_available'] = os.environ.get('SMART_TV_TIZEN_RECEIVER')=='1'
                 return self.reply(200, config)
+            config['native_available'] = native_cast.available
+            config['tizen_receiver_available'] = os.environ.get('SMART_TV_TIZEN_RECEIVER')=='1'
             return self.reply(200, render_share(
                 'share' if parsed.path == '/share' else 'screen', config, CSRF), 'text/html')
         if parsed.path == '/api/health':
@@ -193,6 +289,8 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get('Origin')
         if origin and origin != self.origin():
             return self.reply(403, {'error': 'Origine non consentita'})
+        if self.path.startswith('/api/native/'):
+            return self.native_post()
         if self.path != '/api/command':
             return self.reply(404, {'error': 'Risorsa non trovata'})
         if self.headers.get_content_type() != 'application/json':
@@ -313,6 +411,11 @@ if __name__ == '__main__':
     parser.add_argument('--wss-port', type=int, default=8768)
     parser.add_argument('--tls-cert', default=os.environ.get('SMART_TV_TLS_CERT'))
     parser.add_argument('--tls-key', default=os.environ.get('SMART_TV_TLS_KEY'))
+    parser.add_argument('--ios-tls-cert', default=os.environ.get('SMART_TV_IOS_TLS_CERT'))
+    parser.add_argument('--ios-tls-key', default=os.environ.get('SMART_TV_IOS_TLS_KEY'))
+    parser.add_argument('--ios-profile', default=os.environ.get('SMART_TV_IOS_PROFILE'))
+    parser.add_argument('--ios-https-port', type=int, default=8769)
+    parser.add_argument('--ios-wss-port', type=int, default=8770)
     args = parser.parse_args()
     tls = None
     if args.tls_cert or args.tls_key:
@@ -321,6 +424,15 @@ if __name__ == '__main__':
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.minimum_version = ssl.TLSVersion.TLSv1_2
         tls.load_cert_chain(args.tls_cert, args.tls_key)
+    ios_tls = None
+    ios_profile = None
+    if args.ios_tls_cert or args.ios_tls_key or args.ios_profile:
+        if not all((args.ios_tls_cert, args.ios_tls_key, args.ios_profile)):
+            parser.error('Per iPhone servono certificato, chiave TLS e profilo pubblico')
+        ios_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ios_tls.minimum_version = ssl.TLSVersion.TLSv1_2
+        ios_tls.load_cert_chain(args.ios_tls_cert, args.ios_tls_key)
+        ios_profile = load_profile(args.ios_profile)
     server = ThreadingHTTPServer((args.bind, args.port), Handler)
     server.daemon_threads = True
     server.http_port = server.server_port
@@ -334,15 +446,32 @@ if __name__ == '__main__':
         secure_server.https_port = secure_server.server_port
         server.https_port = secure_server.server_port
         secure_server.socket = tls.wrap_socket(secure_server.socket, server_side=True)
+    ios_server = None
+    if ios_tls:
+        ios_server = ThreadingHTTPServer((args.bind, args.ios_https_port), Handler)
+        ios_server.daemon_threads = True
+        ios_server.scheme = 'https'
+        ios_server.http_port = server.server_port
+        ios_server.https_port = ios_server.server_port
+        ios_server.socket = ios_tls.wrap_socket(ios_server.socket, server_side=True)
+        for http_server in (server, secure_server, ios_server):
+            if http_server:
+                http_server.ios_profile = ios_profile
+                http_server.ios_https_port = ios_server.server_port
     sharing = ShareRelay(CSRF, http_port=server.server_port,
                          https_port=secure_server.server_port if secure_server else args.https_port)
     try:
-        sharing.start(args.bind, args.share_port, tls, args.wss_port)
+        sharing.start(args.bind, args.share_port, tls, args.wss_port, ios_tls, args.ios_wss_port,
+                      ios_server.server_port if ios_server else args.ios_https_port)
+        if ios_server:
+            ios_server.wss_port = sharing.extra_secure_port
     except RuntimeError as exc:
         server.server_close()
         parser.exit(1, f'{exc}: {sharing.error}\n')
     if secure_server:
         threading.Thread(target=secure_server.serve_forever, daemon=True).start()
+    if ios_server:
+        threading.Thread(target=ios_server.serve_forever, daemon=True).start()
     guide.start()
     print(f'Dashboard: http://127.0.0.1:{args.port}', flush=True)
     for address in sorted(allowed_hosts - {'localhost', '127.0.0.1'}):
@@ -352,8 +481,12 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     finally:
+        native_cast.stop()
         guide.stop.set()
         sharing.stop()
+        if ios_server:
+            ios_server.shutdown()
+            ios_server.server_close()
         if secure_server:
             secure_server.shutdown()
             secure_server.server_close()

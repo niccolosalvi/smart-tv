@@ -179,3 +179,14 @@ class CommandTests(unittest.TestCase):
             route.getsockname.return_value = ('198.51.100.21', 1234)
             self.assertEqual(handler.screen_url(), 'http://198.51.100.21:8765/screen')
             route.connect.assert_called_once_with((server.HOST, server.PORT))
+
+    def test_return_in_streaming_app_sends_key_without_changing_view(self):
+        for app in ('netflix', 'youtube', 'primevideo'):
+            self.transport.send.reset_mock()
+            server.view.select(app)
+            before = server.view.get()
+            code, data = self.post({'key': 'KEY_RETURN'})
+            self.assertEqual(code, 200)
+            self.transport.send.assert_called_once_with(['KEY_RETURN'], 'KEY_RETURN')
+            self.assertEqual(data['context']['source'], app)
+            self.assertEqual(data['context']['revision'], before['revision'])

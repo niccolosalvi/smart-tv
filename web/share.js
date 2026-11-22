@@ -1,16 +1,40 @@
 'use strict';
 const config=JSON.parse(document.getElementById('share-config').textContent);
-const $=id=>document.getElementById(id),message=text=>$('status').textContent=text;
+const $=id=>document.getElementById(id);
+function message(text){$('status').textContent=$('remote-status').textContent=text;$('remote-stop').disabled=$('stop').disabled;}
 const target=new URL(config.server),wsUrl=config.ws_url||('ws://'+target.hostname+':'+config.port+'/screen');
 $('receiver').href=config.receiver_url||config.server+'/screen';$('receiver').textContent=$('receiver').href;
-$('back').href=config.server+'/';$('secure-link').href=config.https_url||config.server+'/share';
+$('secure-link').href=config.https_url||config.server+'/share';
+function showView(){
+ const remote=location.hash==='#telecomando';
+ $('share-view').hidden=remote;$('remote-view').hidden=!remote;$('remote-stop').hidden=!remote;
+ document.body.classList.toggle('remote-mode',remote);
+ $('back').href=remote?'#condivisione':'#telecomando';$('back').textContent=remote?'← Condivisione':'← Telecomando';
+ if(remote&&!$('remote-frame').getAttribute('src'))$('remote-frame').src=config.server+'/remote-panel';
+}
+if(target.origin===location.origin){
+ window.addEventListener('hashchange',showView);
+ $('remote-frame').addEventListener('load',()=>{
+  // Same-origin controls run independently, while this document owns capture.
+  // Returning to sharing must never create another capture document in the frame.
+  const doc=$('remote-frame').contentDocument,link=doc&&doc.querySelector('.share-link-btn');
+  if(link){link.textContent='Torna alla condivisione →';link.href='#';link.onclick=event=>{event.preventDefault();location.hash='condivisione';};}
+ });
+ showView();
+}else{
+ // The optional legacy localhost launcher cannot embed the LAN dashboard.
+ $('back').href=config.server+'/';$('back').target='_blank';$('back').rel='noopener';
+}
+$('remote-stop').onclick=()=>stop();
 let stream=null,socket=null,reader=null,worker=null,running=false,generation=0;
 let windowSize=3,reservations=0,nextSeq=1,codec='',closePromise=null,needClose=false,forceJPEG=false;
 let pending=new Map(),statsTimer=null,statsTime=0,frames=0,bytes=0,acks=0,rtt=0,bufferMs=0,captureMode='';
 let encoderGeneration=0;
+let encodedWidth=0,encodedHeight=0;
 let openingPromise=null,connectTimer=null;
 let audioSender=null;
 let auxiliaryAudio=null,pendingAudioSender=null,selectingAudio=false;
+let nativeSender=null;
 const captureAudioOptions={echoCancellation:false,noiseSuppression:false,autoGainControl:false,
  suppressLocalAudioPlayback:true,restrictOwnAudio:false};
 function audioOptions(onStop){const voice=$('audio-quality').value==='voice';return {channels:voice?1:2,bitrate:voice?64000:128000,onStop};}
@@ -18,6 +42,9 @@ function audioStatus(text){$('audio-status').textContent=text;}
 function stopTracks(captured){if(captured)captured.getTracks().forEach(track=>track.stop());}
 const supported=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia&&window.Worker&&window.VideoFrame;
 $('open-tv').disabled=!config.available;
+if((!config.native_available||target.origin!==location.origin)&&$('transport').value==='native')$('transport').value='auto';
+for(const option of ($('transport').options||[]))if(option.value==='native')option.disabled=!config.native_available||target.origin!==location.origin;
+for(const option of ($('transport').options||[]))if(option.value==='native-app')option.disabled=!config.native_available||!config.tizen_receiver_available||target.origin!==location.origin;
 async function tvCommand(action,keepalive=false){
  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':config.key},body:JSON.stringify({screen:action}),keepalive,signal:keepalive?undefined:AbortSignal.timeout(25000)});
  const result=await response.json();if(!response.ok)throw Error(result.error||'Richiesta rifiutata');return result;
@@ -41,6 +68,11 @@ else if(!supported){
 function destroyWorker(){encoderGeneration++;if(worker){worker.terminate();worker=null;}reservations=0;pending.clear();}
 function stop(text,keepalive=false){
  const close=needClose;needClose=false;generation++;running=false;clearInterval(statsTimer);clearTimeout(connectTimer);destroyWorker();
+ if(nativeSender){
+  const active=nativeSender;nativeSender=null;
+  closePromise=active.stop(keepalive).catch(error=>{$('tv-status').textContent='Chiusura video: '+error.message;})
+   .finally(()=>{closePromise=null;$('start').disabled=!supported||!config.available;});
+ }
  if(audioSender){audioSender.stop();audioSender=null;}
  if(pendingAudioSender){pendingAudioSender.stop();pendingAudioSender=null;}
  stopTracks(auxiliaryAudio);auxiliaryAudio=null;$('select-audio').disabled=true;
@@ -48,7 +80,8 @@ function stop(text,keepalive=false){
  if(stream){stream.getTracks().forEach(track=>{track.onended=null;track.stop();});stream=null;}
  if(socket){socket.onclose=socket.onerror=socket.onmessage=null;socket.close();socket=null;}
  $('preview').srcObject=null;$('preview').hidden=true;$('stop').disabled=true;
- $('width').disabled=$('fps').disabled=$('transport').disabled=false;
+ $('open-tv').disabled=!config.available;
+ $('width').disabled=$('fps').disabled=$('transport').disabled=$('video-profile').disabled=false;
  $('audio-enabled').disabled=$('audio-quality').disabled=false;
  message(text||'Condivisione terminata.');
  if(close&&!closePromise){
@@ -69,6 +102,11 @@ function packet(data){
  new Uint8Array(buffer,32).set(content);
  pending.set(seq,{sent:performance.now(),kind:data.kind,count});bytes+=buffer.byteLength;socket.send(buffer);
 }
+function effectiveFPS(mode){return Math.min(Number($('fps').value),mode==='h264'?60:30);}
+function paceCapture(){
+ const track=stream&&stream.getVideoTracks()[0];
+ if(track&&track.applyConstraints)track.applyConstraints({frameRate:{ideal:effectiveFPS(codec),max:effectiveFPS(codec)}}).catch(()=>{});
+}
 function beginEncoding(capabilities){
  if(!running)return;destroyWorker();
  const currentGeneration=generation;
@@ -79,20 +117,22 @@ function beginEncoding(capabilities){
   if(currentGeneration!==generation||currentEncoder!==encoderGeneration||!running)return;
   const data=event.data;
   if(data.type==='configure'){
+   encodedWidth=data.width;encodedHeight=data.height;
    codec=data.codec;pending.clear();socket.send(JSON.stringify(data));
   }else if(data.type==='packet')packet(data);
   else if(data.type==='processed')reservations=Math.max(0,reservations-1);
-  else if(data.type==='mode')codec=data.mode;
+  else if(data.type==='mode'){codec=data.mode;paceCapture();}
  };
  worker.onerror=()=>stop('Codifica non disponibile nel browser. Ricarica la pagina.');
- worker.postMessage({type:'start',codec,width:Number($('width').value),fps:Number($('fps').value)});
+ paceCapture();
+ worker.postMessage({type:'start',codec,width:Number($('width').value),fps:effectiveFPS(codec),profile:$('video-profile').value});
  message((codec==='h264'?'Video H.264':'Immagini adattive')+' · collegamento alla TV…');
 }
 function push(frame){
  // AVC may emit an init packet plus media from one output callback. Images
  // produce exactly one packet, so can use the whole bounded network window.
  const credits=codec==='h264'?windowSize-1:windowSize;
- if(!running||!worker||reservations>=2||pending.size+reservations>=credits||socket.bufferedAmount>512*1024){frame.close();return;}
+ if(!running||!worker||reservations>=1||pending.size+reservations>=credits||socket.bufferedAmount>512*1024){frame.close();return;}
  reservations++;worker.postMessage({type:'frame',frame},[frame]);
 }
 async function readFrames(epoch){
@@ -116,34 +156,43 @@ async function readFrames(epoch){
  }
 }
 function updateStats(){
- if(!running)return;const now=performance.now(),elapsed=(now-statsTime)/1000;
+ if(!running||document.hidden)return;const now=performance.now(),elapsed=(now-statsTime)/1000;
  if(pending.size&&now-Math.min(...[...pending.values()].map(item=>item.sent))>10000){stop('La TV non risponde. Riprova la condivisione.');return;}
  if(!worker)return;
- message((codec==='h264'?'H.264':'Immagini adattive')+' · '+(frames/elapsed).toFixed(1)+' immagini/s ricevute · '+(bytes*8/elapsed/1000000).toFixed(2)+' Mb/s video · conferma TV '+Math.round(acks?rtt/acks:0)+' ms'+(codec==='h264'?' · buffer '+Math.round(bufferMs)+' ms':'')+captureMode);
+ message((codec==='h264'?'H.264':'Immagini adattive')+' · '+encodedWidth+'×'+encodedHeight+' · '+(frames/elapsed).toFixed(1)+' immagini/s ricevute · '+(bytes*8/elapsed/1000000).toFixed(2)+' Mb/s video · conferma TV '+Math.round(acks?rtt/acks:0)+' ms'+(codec==='h264'?' · buffer '+Math.round(bufferMs)+' ms':'')+captureMode);
  frames=bytes=acks=rtt=0;statsTime=now;
 }
 $('start').onclick=async()=>{
  const epoch=++generation;$('start').disabled=true;message('Scegli cosa condividere nel browser.');
  try{
-  const fps=Number($('fps').value),width=Number($('width').value);
+  const nativeMode=$('transport').value==='native'||$('transport').value==='native-app';
+  const fps=effectiveFPS($('transport').value==='jpeg'?'jpeg':'h264'),width=Number($('width').value);
   const wantAudio=$('audio-enabled').checked;
-  if(wantAudio)audioSender=new ScreenAudioSender({key:config.key,ws_url:wsUrl},audioOptions(),audioStatus);
+  if(wantAudio&&!nativeMode)audioSender=new ScreenAudioSender({key:config.key,ws_url:wsUrl},audioOptions(),audioStatus);
   else $('audio-status').textContent='Audio disattivato.';
   // Include all system/browser audio while requesting TV-only playback. With
   // restrictOwnAudio=false, Chromium/Windows can select loopbackWithMute.
   // Tab capture uses the same suppression request without excluding other apps
   // from a monitor capture. The browser owns mute/restore for the capture lifetime.
-  const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:fps,max:fps},width:{ideal:width,max:width},height:{max:720}},
+  const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:fps,max:fps},width:{ideal:width,max:width},height:{max:width>1280?1080:720}},
    audio:wantAudio?{...captureAudioOptions}:false,systemAudio:wantAudio?'include':'exclude',
    windowAudio:wantAudio?'system':'exclude',audioSelection:wantAudio?'preferred':undefined});
   if(epoch!==generation){captured.getTracks().forEach(track=>track.stop());return;}
-  stream=captured;needClose=true;forceJPEG=$('transport').value==='jpeg';
-  const track=stream.getVideoTracks()[0];try{track.contentHint='detail';}catch(ignored){}
-  track.onended=()=>stop();$('stop').disabled=false;$('width').disabled=$('fps').disabled=$('transport').disabled=true;
+  stream=captured;needClose=!nativeMode;forceJPEG=$('transport').value==='jpeg';
+  const track=stream.getVideoTracks()[0];try{track.contentHint=$('video-profile').value==='cinema'?'motion':'detail';}catch(ignored){}
+  track.onended=()=>stop();$('stop').disabled=false;$('width').disabled=$('fps').disabled=$('transport').disabled=$('video-profile').disabled=true;
   $('audio-enabled').disabled=$('audio-quality').disabled=true;
   $('select-audio').disabled=false;
   if(audioSender)audioSender.start(stream.getAudioTracks()[0],track.getSettings().displaySurface);
   $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
+  if(nativeMode){
+   needClose=false;running=true;$('select-audio').disabled=true;$('open-tv').disabled=true;
+   $('tv-status').textContent='Avvio del lettore video nativo della TV; il browser della TV non è necessario.';
+   audioStatus(stream.getAudioTracks().length?'Audio AAC sincronizzato nel video nativo.':'Nessuna traccia audio selezionata nel browser.');
+   nativeSender=new ScreenNativeSender(config,message,error=>{if(epoch===generation)stop('Video nativo: '+error.message);});
+   await nativeSender.start(stream,{width,fps,receiver:$('transport').value==='native-app'?'tizen':'dlna'});
+   return;
+  }
   const response=await fetch('/api/share');const live=await response.json();
   if(epoch!==generation)return;
   if(!live.receiver_connected)await openTV();if(epoch!==generation)return;
@@ -162,7 +211,7 @@ $('start').onclick=async()=>{
    else if(data.type==='ack'){
     const sent=pending.get(data.seq);if(!sent)return;
     const delay=performance.now()-sent.sent;pending.delete(data.seq);acks++;rtt+=delay;bufferMs=data.bufferMs||0;
-    frames+=sent.count;if(worker)worker.postMessage({type:'feedback',rtt:delay,bufferMs});
+    frames+=sent.count;if(worker)worker.postMessage({type:'feedback',rtt:delay,bufferMs,decodeMs:data.decodeMs});
    }
   };
   socket.onerror=()=>stop('Collegamento al Raspberry non riuscito.');
@@ -206,3 +255,9 @@ $('select-audio').onclick=async()=>{
  }
 };
 $('stop').onclick=()=>stop();window.addEventListener('pagehide',()=>stop(undefined,true));
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden||!running)return;
+ // Time spent suspended by the OS isn't a TV acknowledgment timeout.
+ const now=performance.now();for(const packet of pending.values())packet.sent=now;
+ statsTime=now;frames=bytes=acks=rtt=0;
+});
