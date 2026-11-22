@@ -133,14 +133,32 @@ class Remote:
                         'current_time': st.get('current_time'),
                         'duration': st.get('duration'),
                         'state': st.get('state'),
+                        'sampled_at': now,
                     }
+        yt_progress = None
+        if active_app == 'youtube' and isinstance(self._last_youtube_progress, dict):
+            prog = self._last_youtube_progress
+            cur = prog.get('current_time')
+            dur = prog.get('duration')
+            st_code = prog.get('state')
+            sampled = prog.get('sampled_at', now)
+            if isinstance(cur, (int, float)) and st_code == 1:
+                cur = int(round(cur + max(0.0, now - sampled)))
+                if isinstance(dur, (int, float)) and dur > 0:
+                    cur = min(int(dur), cur)
+            yt_progress = {
+                'video_id': prog.get('video_id'),
+                'current_time': cur,
+                'duration': dur,
+                'state': st_code,
+            }
         result = {
             'tv_online': True,
             'power_state': 'on',
             'active_app': active_app,
             'running_apps': running_apps,
             'youtube_video_id': self._last_youtube_video_id if active_app == 'youtube' else None,
-            'youtube_progress': self._last_youtube_progress if active_app == 'youtube' else None,
+            'youtube_progress': yt_progress,
         }
         self._status_cache = result
         self._status_time = now
@@ -204,6 +222,8 @@ class Remote:
                 for index, key in enumerate(keys):
                     timeline.emit('Server → TV', f'WS Click {key}')
                     self.tv.send_key(key, key_press_delay=pauses[index] if pauses else None)
+                if any(k in {'KEY_PLAY', 'KEY_PAUSE', 'KEY_FF', 'KEY_REWIND', 'KEY_ENTER', 'KEY_RETURN'} for k in keys):
+                    self._lounge_vid_check_time = 0.0
                 timeline.emit('Server', 'Scrittura WebSocket completata; nessun ACK di esecuzione previsto per i tasti')
                 return record(action or ','.join(keys), start, 'sent',
                     note='Invio WebSocket e pausa inclusa; effetto sullo schermo non confermato')
@@ -465,7 +485,11 @@ class Remote:
                 if http_status is None:
                     raise RuntimeError('YouTubeLoungeUnavailable')
                 if isinstance(self._last_youtube_progress, dict):
-                    self._last_youtube_progress = {**self._last_youtube_progress, 'current_time': sec}
+                    self._last_youtube_progress = {
+                        **self._last_youtube_progress,
+                        'current_time': sec,
+                        'sampled_at': time.monotonic(),
+                    }
                 self._lounge_vid_check_time = 0.0
                 self.invalidate_status_cache()
                 return record('youtube:seek', started, 'sent', transport='lounge',

@@ -77,8 +77,11 @@ let previewDuration = 0;
 let storyboardSpec = null;
 const sheetCache = new Map();
 let pendingDraw = null;
+let lastPaintedTile = '';
 let userScrubUntil = 0;
-let lastAutoSyncedSec = -1;
+let liveBaseSec = null;
+let liveBaseAt = 0;
+let liveState = null;
 
 function drawFullImage(img) {
  if (!previewCanvas || !previewCtx || !img.naturalWidth || !img.naturalHeight) return;
@@ -89,13 +92,14 @@ function drawFullImage(img) {
  previewCtx.drawImage(img, (previewCanvas.width - dw) / 2, (previewCanvas.height - dh) / 2, dw, dh);
 }
 
-function drawStoryboardTile(img, sb, col, row) {
+function drawStoryboardTile(img, sb, col, row, tileKey = '') {
  if (!previewCanvas || !previewCtx || !img.naturalWidth || !img.naturalHeight) return;
  const sx = col * sb.width;
  const sy = row * sb.height;
  if (sx + sb.width > img.naturalWidth + 1 || sy + sb.height > img.naturalHeight + 1) return;
  previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
  previewCtx.drawImage(img, sx, sy, sb.width, sb.height, 0, 0, previewCanvas.width, previewCanvas.height);
+ if (tileKey) lastPaintedTile = tileKey;
 }
 
 function getSheetImage(videoId, sb, sheetIdx) {
@@ -109,7 +113,7 @@ function getSheetImage(videoId, sb, sheetIdx) {
  img.onload = () => {
   entry.loaded = true;
   if (pendingDraw && pendingDraw.videoId === videoId && pendingDraw.sheetIdx === sheetIdx) {
-   drawStoryboardTile(img, sb, pendingDraw.col, pendingDraw.row);
+   drawStoryboardTile(img, sb, pendingDraw.col, pendingDraw.row, pendingDraw.tileKey);
   }
  };
  img.onerror = () => {
@@ -133,7 +137,7 @@ function updateSeekUI(seconds, updateInput = true) {
  if (updateInput && seekTimeInput) seekTimeInput.value = formatted;
 }
 
-function seekPreviewFrame(seconds) {
+function seekPreviewFrame(seconds, force = false) {
  const target = Math.max(0, Math.floor(Number(seconds) || 0));
  if (previewBadge) previewBadge.textContent = formatSeekTime(target);
  if (!currentPreviewVideoId || !storyboardSpec || !previewCanvas || previewWrap?.hidden) return;
@@ -147,11 +151,13 @@ function seekPreviewFrame(seconds) {
  const cellIdx = frameIdx % perSheet;
  const col = cellIdx % sb.cols;
  const row = Math.floor(cellIdx / sb.cols);
+ const tileKey = `${currentPreviewVideoId}:${sheetIdx}:${col}:${row}`;
+ if (!force && tileKey === lastPaintedTile) return;
 
- pendingDraw = {videoId: currentPreviewVideoId, sheetIdx, col, row};
+ pendingDraw = {videoId: currentPreviewVideoId, sheetIdx, col, row, tileKey};
  const entry = getSheetImage(currentPreviewVideoId, sb, sheetIdx);
  if (entry.loaded && !entry.failed) {
-  drawStoryboardTile(entry.img, sb, col, row);
+  drawStoryboardTile(entry.img, sb, col, row, tileKey);
  }
  // Preload adjacent sheets for instantaneous scrubbing.
  if (sheetIdx + 1 < totalSheets) getSheetImage(currentPreviewVideoId, sb, sheetIdx + 1);
@@ -177,7 +183,8 @@ async function loadStoryboard(videoId) {
    storyboardSpec = data.storyboard;
    previewCanvas.width = storyboardSpec.width;
    previewCanvas.height = storyboardSpec.height;
-   seekPreviewFrame(Number(seekSlider?.value) || 0);
+   lastPaintedTile = '';
+   seekPreviewFrame(Number(seekSlider?.value) || 0, true);
   }
  } catch {}
 }
@@ -188,7 +195,10 @@ function syncYoutubePreview(videoId) {
  previewDuration = 0;
  storyboardSpec = null;
  pendingDraw = null;
- lastAutoSyncedSec = -1;
+ lastPaintedTile = '';
+ liveBaseSec = null;
+ liveBaseAt = 0;
+ liveState = null;
  sheetCache.clear();
  if (previewTitle) previewTitle.textContent = '';
  if (previewCanvas) {
@@ -209,6 +219,25 @@ function syncYoutubePreview(videoId) {
 }
 window.syncYoutubePreview = syncYoutubePreview;
 
+function currentLiveSeconds() {
+ if (liveBaseSec === null) return null;
+ if (liveState !== 1) return liveBaseSec;
+ const elapsed = Math.max(0, Math.floor((Date.now() - liveBaseAt) / 1000));
+ const total = liveBaseSec + elapsed;
+ return previewDuration > 0 ? Math.min(previewDuration, total) : total;
+}
+
+function tickLiveYoutubeTiming() {
+ if (document.hidden || liveBaseSec === null) return;
+ const isEditing = Date.now() < userScrubUntil || document.activeElement === seekTimeInput;
+ if (isEditing) return;
+ const cur = currentLiveSeconds();
+ if (cur === null) return;
+ updateSeekUI(cur, true);
+ seekPreviewFrame(cur);
+}
+setInterval(tickLiveYoutubeTiming, 1000);
+
 function syncYoutubeProgress(progress) {
  if (!progress || typeof progress !== 'object') return;
  if (progress.video_id) syncYoutubePreview(progress.video_id);
@@ -219,14 +248,11 @@ function syncYoutubeProgress(progress) {
    if (seekSlider) seekSlider.max = String(dur);
   }
  }
- const isEditing = Date.now() < userScrubUntil || document.activeElement === seekTimeInput;
- if (!isEditing && typeof progress.current_time === 'number' && progress.current_time >= 0) {
-  const cur = Math.round(progress.current_time);
-  updateSeekUI(cur, true);
-  if (Math.abs(cur - lastAutoSyncedSec) >= 8 || lastAutoSyncedSec < 0) {
-   lastAutoSyncedSec = cur;
-   seekPreviewFrame(cur);
-  }
+ if (typeof progress.state === 'number') liveState = progress.state;
+ if (typeof progress.current_time === 'number' && progress.current_time >= 0) {
+  liveBaseSec = Math.round(progress.current_time);
+  liveBaseAt = Date.now();
+  tickLiveYoutubeTiming();
  } else if (previewDuration > 0) {
   updateSeekUI(Number(seekSlider?.value) || 0, false);
  }
@@ -239,7 +265,7 @@ if (previewToggle && previewWrap) {
   previewWrap.hidden = hiding;
   previewToggle.setAttribute('aria-expanded', String(!hiding));
   previewToggle.textContent = hiding ? 'Mostra anteprima' : 'Nascondi anteprima';
-  if (!hiding) seekPreviewFrame(Number(seekSlider?.value) || 0);
+  if (!hiding) seekPreviewFrame(Number(seekSlider?.value) || 0, true);
  });
 }
 
@@ -298,7 +324,8 @@ if (seekForm) {
    return;
   }
   userScrubUntil = 0;
-  lastAutoSyncedSec = parsed;
+  liveBaseSec = parsed;
+  liveBaseAt = Date.now();
   updateSeekUI(parsed, true);
   seekPreviewFrame(parsed);
   await command({youtube_seek: parsed});
