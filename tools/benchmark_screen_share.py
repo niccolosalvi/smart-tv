@@ -580,6 +580,10 @@ def _run_e2e_scenario(browser, base_url, relay, scenario):
 
         tx.add_init_script(f"({SENDER_OBSERVER_JS})({json.dumps(scenario['source'])});")
         tx.goto(base_url + '/share')
+        for sect in ('#video-section', '#audio-section'):
+            loc = tx.locator(sect)
+            if loc.count() and loc.get_attribute('open') is None:
+                loc.locator('summary').first.click()
         tx.locator('#audio-enabled').uncheck()
         tx.locator('#video-profile').select_option(scenario['profile'])
         tx.locator('#width').select_option(str(scenario['width']))

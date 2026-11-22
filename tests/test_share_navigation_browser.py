@@ -1,7 +1,6 @@
-"""Optional real-browser regression: one capture survives mobile remote navigation.
+"""Optional real-browser regression: collapsible settings and return to TV antenna.
 
-Run with SMART_TV_BROWSER_TESTS=1 and Playwright/Edge installed. This simulates
-the video-render callback fallback, not iOS background execution.
+Run with SMART_TV_BROWSER_TESTS=1 and Playwright/Edge installed.
 """
 import os
 import tempfile
@@ -14,7 +13,7 @@ from unittest.mock import Mock, patch
 
 @unittest.skipUnless(os.environ.get('SMART_TV_BROWSER_TESTS')=='1', 'Optional Playwright/Edge test')
 class ShareNavigationBrowserTests(unittest.TestCase):
-    def test_mobile_remote_navigation_keeps_same_capture_and_stop_releases_it(self):
+    def test_collapsible_sections_removed_open_tv_and_back_switches_to_antenna(self):
         from playwright.sync_api import sync_playwright, expect
         with tempfile.TemporaryDirectory() as runtime, patch.dict(os.environ,{'LOCALAPPDATA':runtime,'TV_HOST':'127.0.0.1'}):
             import server
@@ -27,6 +26,7 @@ class ShareNavigationBrowserTests(unittest.TestCase):
             base=f'http://127.0.0.1:{http.server_port}'
             remote=Mock();remote.tv.is_alive.return_value=True
             remote.send.return_value={'status':'sent'};remote.close_screen.return_value={'status':'sent'}
+            remote.switch_to_tv.return_value={'status':'sent'}
             try:
                 with patch.object(server,'sharing',relay),patch.object(server,'remote',remote), \
                         patch.object(server,'view',ViewState(Path(runtime)/'view.json')),sync_playwright() as pw:
@@ -47,38 +47,39 @@ class ShareNavigationBrowserTests(unittest.TestCase):
                             const stream=canvas.captureStream(15);window.captureTrack=stream.getVideoTracks()[0];return stream;
                         };
                     ''')
-                    sender.goto(base+'/share');sender.locator('#audio-enabled').uncheck()
-                    sender.locator('#transport').select_option('jpeg');sender.locator('#start').click()
+                    sender.goto(base+'/share')
+                    expect(sender.locator('#open-tv')).to_have_count(0)
+                    video_sect=sender.locator('#video-section')
+                    audio_sect=sender.locator('#audio-section')
+                    self.assertIsNone(video_sect.get_attribute('open'))
+                    self.assertIsNone(audio_sect.get_attribute('open'))
+                    expect(sender.locator('#transport')).to_be_hidden()
+                    expect(sender.locator('#audio-enabled')).to_be_hidden()
+
+                    video_sect.locator('summary.collapsible-head').click()
+                    audio_sect.locator('summary.collapsible-head').click()
+                    expect(sender.locator('#transport')).to_be_visible()
+                    expect(sender.locator('#audio-enabled')).to_be_visible()
+
+                    sender.locator('#audio-enabled').uncheck()
+                    sender.locator('#transport').select_option('jpeg')
+                    video_sect.locator('summary.collapsible-head').click()
+                    audio_sect.locator('summary.collapsible-head').click()
+                    expect(sender.locator('#transport')).to_be_hidden()
+                    expect(sender.locator('#audio-enabled')).to_be_hidden()
+
+                    sender.locator('#start').click()
                     expect(sender.locator('#status')).to_contain_text('ricevute',timeout=12000)
-                    original=relay.sender
-                    def assert_more_frames():
-                        before=relay.metrics['packets'];deadline=time.monotonic()+6
-                        while relay.metrics['packets']<before+3 and time.monotonic()<deadline:sender.wait_for_timeout(100)
-                        self.assertGreaterEqual(relay.metrics['packets'],before+3)
-                        self.assertIs(relay.sender,original)
-                        self.assertEqual(sender.evaluate('captureTrack.readyState'),'live')
-                        self.assertEqual(sender.evaluate('captureCalls'),1)
+                    deadline=time.monotonic()+6
+                    while relay.metrics['packets']<3 and time.monotonic()<deadline:sender.wait_for_timeout(100)
+                    self.assertGreaterEqual(relay.metrics['packets'],3)
+
                     sender.locator('#back').click()
-                    expect(sender.locator('#remote-view')).to_be_visible()
-                    panel=sender.frame_locator('#remote-frame')
-                    expect(panel.locator('#view-select')).to_be_visible()
-                    # A real remote button invokes the existing authenticated endpoint.
-                    panel.locator('button[data-volume="2"]:visible').first.click()
-                    expect(panel.locator('#status')).not_to_contain_text('Invio',timeout=5000)
-                    self.assertEqual(remote.send.call_count,1)
-                    assert_more_frames()
-                    # Browser Back restores sharing inside the same capture document.
-                    sender.go_back();expect(sender.locator('#share-view')).to_be_visible();assert_more_frames()
-                    sender.locator('#back').click()
-                    panel.locator('.share-link-btn').click()
-                    expect(sender.locator('#share-view')).to_be_visible();assert_more_frames()
-                    sender.locator('#back').click();sender.locator('#remote-stop').click()
-                    expect(sender.locator('#remote-status')).to_have_text('Condivisione terminata.')
-                    expect(sender.locator('#remote-stop')).to_be_disabled()
-                    self.assertEqual(sender.evaluate('captureTrack.readyState'),'ended')
-                    deadline=time.monotonic()+5
-                    while remote.close_screen.call_count<1 and time.monotonic()<deadline:sender.wait_for_timeout(50)
-                    remote.close_screen.assert_called_once()
+                    expect(sender).to_have_url(base+'/',timeout=10000)
+                    expect(sender.locator('#view-select')).to_have_value('tv')
+                    expect(sender.locator('#channels-panel')).to_be_visible()
+                    remote.switch_to_tv.assert_called_once_with()
+                    remote.close_screen.assert_not_called()
                     self.assertFalse(errors,errors)
                     browser.close()
             finally:

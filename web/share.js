@@ -1,31 +1,17 @@
 'use strict';
 const config=JSON.parse(document.getElementById('share-config').textContent);
 const $=id=>document.getElementById(id);
-function message(text){$('status').textContent=$('remote-status').textContent=text;$('remote-stop').disabled=$('stop').disabled;}
+function message(text){$('status').textContent=text;}
 const target=new URL(config.server),wsUrl=config.ws_url||('ws://'+target.hostname+':'+config.port+'/screen');
 $('receiver').href=config.receiver_url||config.server+'/screen';$('receiver').textContent=$('receiver').href;
 $('secure-link').href=config.https_url||config.server+'/share';
-function showView(){
- const remote=location.hash==='#telecomando';
- $('share-view').hidden=remote;$('remote-view').hidden=!remote;$('remote-stop').hidden=!remote;
- document.body.classList.toggle('remote-mode',remote);
- $('back').href=remote?'#condivisione':'#telecomando';$('back').textContent=remote?'← Condivisione':'← Telecomando';
- if(remote&&!$('remote-frame').getAttribute('src'))$('remote-frame').src=config.server+'/remote-panel';
+const homeUrl=target.origin===location.origin?'/':config.server+'/';
+$('back').href=homeUrl;
+let leaving=false;
+if(target.origin!==location.origin){
+ // The optional legacy localhost launcher opens the LAN dashboard separately.
+ $('back').target='_blank';$('back').rel='noopener';
 }
-if(target.origin===location.origin){
- window.addEventListener('hashchange',showView);
- $('remote-frame').addEventListener('load',()=>{
-  // Same-origin controls run independently, while this document owns capture.
-  // Returning to sharing must never create another capture document in the frame.
-  const doc=$('remote-frame').contentDocument,link=doc&&doc.querySelector('.share-link-btn');
-  if(link){link.textContent='Torna alla condivisione →';link.href='#';link.onclick=event=>{event.preventDefault();location.hash='condivisione';};}
- });
- showView();
-}else{
- // The optional legacy localhost launcher cannot embed the LAN dashboard.
- $('back').href=config.server+'/';$('back').target='_blank';$('back').rel='noopener';
-}
-$('remote-stop').onclick=()=>stop();
 let stream=null,socket=null,reader=null,worker=null,running=false,generation=0;
 let windowSize=3,reservations=0,nextSeq=1,codec='',closePromise=null,needClose=false,forceJPEG=false;
 let pending=new Map(),statsTimer=null,statsTime=0,frames=0,bytes=0,acks=0,rtt=0,bufferMs=0,captureMode='';
@@ -35,6 +21,24 @@ let openingPromise=null,connectTimer=null;
 let audioSender=null;
 let auxiliaryAudio=null,pendingAudioSender=null,selectingAudio=false;
 let nativeSender=null;
+async function returnToRemote(event){
+ if(event&&event.preventDefault)event.preventDefault();
+ if(leaving)return;
+ leaving=true;
+ const back=$('back');
+ if(back&&back.setAttribute)back.setAttribute('aria-disabled','true');
+ $('start').disabled=$('stop').disabled=true;
+ // Clear needClose before stop() so returning to TV antenna does not also race
+ // a screen:stop command against /api/command's single-command lock.
+ needClose=false;
+ stop('Ritorno al telecomando e alla TV antenna…');
+ if(closePromise)try{await closePromise;}catch(ignored){}
+ try{
+  await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':config.key},body:JSON.stringify({key:'KEY_TV'}),signal:AbortSignal.timeout(8000)});
+ }catch(ignored){}
+ location.href=homeUrl;
+}
+if(target.origin===location.origin)$('back').addEventListener('click',returnToRemote);
 const captureAudioOptions={echoCancellation:false,noiseSuppression:false,autoGainControl:false,
  suppressLocalAudioPlayback:true,restrictOwnAudio:false};
 function clearLatest(){if(latestFrame){latestFrame.close();latestFrame=null;}}
@@ -55,7 +59,6 @@ function audioOptions(onStop){const voice=$('audio-quality').value==='voice';ret
 function audioStatus(text){$('audio-status').textContent=text;}
 function stopTracks(captured){if(captured)captured.getTracks().forEach(track=>track.stop());}
 const supported=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia&&window.Worker&&window.VideoFrame;
-$('open-tv').disabled=!config.available;
 if((!config.native_available||target.origin!==location.origin)&&$('transport').value==='native')$('transport').value='auto';
 for(const option of ($('transport').options||[]))if(option.value==='native')option.disabled=!config.native_available||target.origin!==location.origin;
 for(const option of ($('transport').options||[]))if(option.value==='native-app')option.disabled=!config.native_available||!config.tizen_receiver_available||target.origin!==location.origin;
@@ -65,10 +68,13 @@ const MODE_HINTS={
  auto:'Sceglie H.264 se supportato o immagini adattive su Samsung 2016; latenza bassa.',
  jpeg:'Invia solo le aree modificate in JPEG/PNG (fino a 30 fps); ideale per desktop e testo.'
 };
+const MODE_LABELS={native:'Video nativo TV','native-app':'Ricevitore Tizen',auto:'Automatica',jpeg:'Compatibile'};
 const useNativeDefault=!!(config.native_available&&target.origin===location.origin);
 function syncModeUI(){
  const mode=$('transport').value;
  $('mode-hint').textContent=MODE_HINTS[mode]||'';
+ $('video-summary').textContent=(MODE_LABELS[mode]||mode)+' · '+$('width').value+' px · '+$('fps').value+' fps';
+ $('audio-summary').textContent=$('audio-enabled').checked?('Attivo · '+($('audio-quality').value==='voice'?'Voce mono':'Stereo')):'Disattivato';
  const cinemaMatch=mode===(useNativeDefault?'native':'auto')&&$('video-profile').value==='cinema'&&$('width').value==='1920'&&$('fps').value==='60';
  const desktopMatch=mode==='auto'&&$('video-profile').value==='balanced'&&$('width').value==='1280'&&$('fps').value==='30';
  for(const [id,active] of [['preset-cinema',cinemaMatch],['preset-desktop',desktopMatch]]){
@@ -90,7 +96,7 @@ function applyPreset(kind){
 }
 $('preset-cinema').onclick=()=>applyPreset('cinema');
 $('preset-desktop').onclick=()=>applyPreset('desktop');
-for(const id of ['transport','video-profile','width','fps'])$(id).addEventListener('change',syncModeUI);
+for(const id of ['transport','video-profile','width','fps','audio-enabled','audio-quality'])$(id).addEventListener('change',syncModeUI);
 syncModeUI();
 async function tvCommand(action,keepalive=false){
  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':config.key},body:JSON.stringify({screen:action}),keepalive,signal:keepalive?undefined:AbortSignal.timeout(25000)});
@@ -98,13 +104,12 @@ async function tvCommand(action,keepalive=false){
 }
 async function openTV(){
  if(openingPromise)return openingPromise;
- $('open-tv').disabled=true;$('tv-status').textContent='Apertura ricevitore sulla TV…';
+ $('tv-status').textContent='Apertura ricevitore sulla TV…';
  openingPromise=tvCommand('open').then(()=>{$('tv-status').textContent='Apertura richiesta. In attesa del collegamento della TV.';})
   .catch(error=>{$('tv-status').textContent='Apertura non confermata: '+error.message;})
-  .finally(()=>{openingPromise=null;$('open-tv').disabled=false;});
+  .finally(()=>{openingPromise=null;});
  return openingPromise;
 }
-$('open-tv').onclick=openTV;
 if(!config.available)message('Relay non disponibile. Ricarica la pagina.');
 else if(!supported){
  $('launch').hidden=false;
@@ -118,7 +123,7 @@ function stop(text,keepalive=false){
  if(nativeSender){
   const active=nativeSender;nativeSender=null;
   closePromise=active.stop(keepalive).catch(error=>{$('tv-status').textContent='Chiusura video: '+error.message;})
-   .finally(()=>{closePromise=null;$('start').disabled=!supported||!config.available;});
+   .finally(()=>{closePromise=null;$('start').disabled=leaving||!supported||!config.available;});
  }
  if(audioSender){audioSender.stop();audioSender=null;}
  if(pendingAudioSender){pendingAudioSender.stop();pendingAudioSender=null;}
@@ -128,7 +133,6 @@ function stop(text,keepalive=false){
  if(socket){socket.onclose=socket.onerror=socket.onmessage=null;socket.close();socket=null;}
  if($('preview').pause)try{$('preview').pause();}catch(ignored){}
  $('preview').srcObject=null;$('preview').hidden=true;$('stop').disabled=true;
- $('open-tv').disabled=!config.available;
  $('width').disabled=$('fps').disabled=$('transport').disabled=$('video-profile').disabled=false;
  $('preset-cinema').disabled=$('preset-desktop').disabled=false;
  $('audio-enabled').disabled=$('audio-quality').disabled=false;
@@ -138,8 +142,8 @@ function stop(text,keepalive=false){
   $('start').disabled=true;$('tv-status').textContent='Chiusura del ricevitore e del browser sulla TV…';
   closePromise=Promise.resolve(openingPromise).then(()=>tvCommand('stop',keepalive)).then(()=>{$('tv-status').textContent='Uscita dal browser richiesta alla TV.';})
    .catch(error=>{$('tv-status').textContent='Chiusura TV non confermata: '+error.message;})
-   .finally(()=>{closePromise=null;$('start').disabled=!supported||!config.available;});
- }else $('start').disabled=!!closePromise||!supported||!config.available;
+   .finally(()=>{closePromise=null;$('start').disabled=leaving||!supported||!config.available;});
+ }else $('start').disabled=leaving||!!closePromise||!supported||!config.available;
 }
 function packet(data){
  if(!socket||socket.readyState!==WebSocket.OPEN)return;
@@ -256,7 +260,7 @@ $('start').onclick=async()=>{
    $('preview').hidden=false;$('preview').srcObject=stream;await $('preview').play();if(epoch!==generation)return;
   }else syncPreview();
   if(nativeMode){
-   needClose=false;running=true;$('select-audio').disabled=true;$('open-tv').disabled=true;
+   needClose=false;running=true;$('select-audio').disabled=true;
    $('tv-status').textContent='Avvio del lettore video nativo della TV; il browser della TV non è necessario.';
    audioStatus(stream.getAudioTracks().length?'Audio AAC sincronizzato nel video nativo.':'Nessuna traccia audio selezionata nel browser.');
    nativeSender=new ScreenNativeSender(config,message,error=>{if(epoch===generation)stop('Video nativo: '+error.message);});
@@ -276,7 +280,7 @@ $('start').onclick=async()=>{
     statsTimer=setInterval(updateStats,1000);readFrames(epoch);
     if(data.viewer_connected)beginEncoding(data.capabilities||{});else message('In attesa della TV…');
    }else if(data.type==='viewer')beginEncoding(data.capabilities||{});
-   else if(data.type==='waiting'){destroyWorker();message('In attesa della TV. Premi Apri sulla TV.');}
+   else if(data.type==='waiting'){destroyWorker();message('In attesa della TV…');}
    else if(data.type==='fallback'){forceJPEG=true;beginEncoding({});}
    else if(data.type==='ack'){
     const sent=pending.get(data.seq);if(!sent)return;
@@ -311,7 +315,7 @@ $('select-audio').onclick=async()=>{
   });
   if(epoch!==generation){replacement.stop();stopTracks(extra);return;}
   stopTracks(auxiliaryAudio);auxiliaryAudio=extra;audioSender=replacement;
-  $('audio-enabled').checked=true;
+  $('audio-enabled').checked=true;syncModeUI();
   const picture=extra.getVideoTracks()[0];
   // Keep the auxiliary display session alive at one tiny frame/s. Stopping its
   // video track can also end audio on some browsers. It is never sent to the TV.

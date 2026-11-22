@@ -16,19 +16,13 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 .top-left{display:flex;align-items:center;gap:8px;min-width:0}
 #back{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);text-decoration:none;font-size:12.5px;font-weight:550;color:var(--text-2);background:var(--surface);transition:background .12s,border-color .12s,color .12s}
 #back:hover{background:var(--surface-2);border-color:#3a3a40;color:var(--white)}
+#back[aria-disabled="true"]{opacity:.6;pointer-events:none}
 .brand{font-weight:650;letter-spacing:-.5px;font-size:18px;color:var(--white)}.brand span{color:var(--dim)}
 
 /* ---- Heading ---- */
 .page-head{margin-bottom:20px}
 h1{font-size:23px;letter-spacing:-.6px;margin:0 0 4px;font-weight:650;color:var(--white)}
 .lead{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5;max-width:62ch}
-
-/* ---- Remote Mode ---- */
-#remote-view .status-box{margin-bottom:8px}
-#remote-view .note{margin:0 0 12px}
-#remote-view iframe{width:100%;height:calc(100dvh - 190px);min-height:440px;border:1px solid var(--line-2);border-radius:var(--r);display:block;background:var(--bg)}
-.remote-mode #preview-panel{position:fixed;bottom:0;left:0;width:2px;height:2px;overflow:hidden;margin:0;padding:0;border:0;pointer-events:none}
-.remote-mode #preview-panel video{width:2px;height:2px;margin:0;border:0}
 
 /* ---- Layout Grid & Cards ---- */
 .grid{display:grid;gap:16px;align-items:start}
@@ -37,18 +31,38 @@ h1{font-size:23px;letter-spacing:-.6px;margin:0 0 4px;font-weight:650;color:var(
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
 h2{font-size:10.5px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin:0}
 
+/* ---- Collapsible Video & Audio Sections ---- */
+details.collapsible{padding:0}
+summary.collapsible-head{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;min-height:56px;user-select:none;transition:background .12s}
+summary.collapsible-head::-webkit-details-marker{display:none}
+summary.collapsible-head:hover{background:var(--surface-2)}
+details.collapsible:not([open]) summary.collapsible-head{border-radius:var(--r)}
+details.collapsible[open] summary.collapsible-head{border-radius:var(--r) var(--r) 0 0;border-bottom:1px solid var(--line)}
+.collapsible-title{display:grid;gap:3px;min-width:0}
+.sect-summary{font-size:12px;color:var(--text-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toggle-pill{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:12px;font-weight:550;color:var(--text-2);background:var(--surface-2);border:1px solid var(--line-2);border-radius:99px;padding:4px 10px;transition:border-color .12s,color .12s}
+summary.collapsible-head:hover .toggle-pill{border-color:#3f3f46;color:var(--white)}
+.toggle-pill svg{width:14px;height:14px;transition:transform .15s}
+details.collapsible:not([open]) .label-hide{display:none}
+details.collapsible[open] .label-show{display:none}
+details.collapsible[open] .toggle-pill svg{transform:rotate(180deg)}
+.collapsible-body{padding:16px 18px 18px}
+
 /* ---- Buttons ---- */
 button,select{font:inherit;color:inherit}
 button{min-height:40px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface-2);cursor:pointer;touch-action:manipulation;font-weight:550;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:7px;-webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s,color .12s,transform .06s}
 button:hover:not(:disabled){background:var(--surface-3);border-color:#3f3f46;color:var(--white)}
 button:active:not(:disabled){transform:scale(.98)}
 button:disabled{opacity:.38;cursor:default}
-#start{min-height:46px;background:var(--white);color:var(--white-ink);border-color:var(--white);font-weight:650;font-size:13.5px}
-#start:hover:not(:disabled){background:#e4e4e7;border-color:#e4e4e7;color:var(--white-ink)}
-#stop,#remote-stop{min-height:46px;background:transparent;color:var(--danger);border-color:var(--line-2)}
-#stop:disabled,#remote-stop:disabled{color:var(--muted)}
-#remote-stop{min-height:36px;padding:0 12px;font-size:12.5px}
-#stop:hover:not(:disabled),#remote-stop:hover:not(:disabled){background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.35)}
+#start,#stop{min-height:50px;padding:0 18px;font-size:15px;font-weight:650;letter-spacing:-.01em;border-radius:10px;gap:9px;border-width:1.5px}
+#start .icon,#stop .icon{width:18px;height:18px;stroke-width:2}
+#start{background:#ffffff;color:#09090b;border-color:#ffffff}
+#start:hover:not(:disabled){background:#e4e4e7;border-color:#e4e4e7;color:#09090b}
+#start:disabled{opacity:1;background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
+#stop{background:#b91c1c;color:#ffffff;border-color:#dc2626}
+#stop:hover:not(:disabled){background:#dc2626;border-color:#ef4444;color:#ffffff}
+#stop:active:not(:disabled){background:#991b1b}
+#stop:disabled{opacity:1;background:var(--surface-2);color:#a1a1aa;border-color:#323238}
 
 /* ---- Preset Switcher ---- */
 .presets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
@@ -62,7 +76,7 @@ button:disabled{opacity:.38;cursor:default}
 .preset.active .preset-sub{color:#52525b}
 
 /* ---- Primary Actions & Live Status ---- */
-.actions{display:grid;grid-template-columns:1.35fr 1fr;gap:8px;margin-bottom:12px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .status-box{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;background:var(--bg);border:1px solid var(--line-2);border-radius:var(--r-sm)}
 .status-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);margin-top:5px;flex-shrink:0;transition:background .2s,box-shadow .2s}
 .is-sharing .status-dot{background:var(--white);box-shadow:0 0 0 3px rgba(250,250,250,.14)}
@@ -76,9 +90,7 @@ button:disabled{opacity:.38;cursor:default}
 
 /* ---- TV Secondary Bar ---- */
 .tv-bar{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:8px}
-.tv-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-#open-tv{min-height:36px;padding:0 12px;font-size:12.5px;background:transparent}
-#tv-status{flex:1 1 180px;margin:0;font-size:12px;color:var(--muted);line-height:1.4}
+#tv-status{margin:0;font-size:12px;color:var(--muted);line-height:1.4}
 #receiver{overflow-wrap:anywhere;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--text-2)}
 
 /* ---- Fields & Custom Minimal Select ---- */
@@ -128,28 +140,25 @@ video{width:100%;max-height:420px;background:#000;border-radius:var(--r-sm);bord
 @media(min-width:860px){
  body{padding:24px 32px 36px}
  .grid{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px}
- .card{padding:20px}
+ .card:not(.collapsible){padding:20px}
+ summary.collapsible-head{padding:16px 20px}
+ .collapsible-body{padding:16px 20px 20px}
 }
 @media(max-width:520px){
  .presets,.fields,.audio-row{grid-template-columns:1fr}
  .actions{grid-template-columns:1fr 1fr}
- .card{padding:15px}
+ .card:not(.collapsible){padding:15px}
+ summary.collapsible-head{padding:14px 15px}
+ .collapsible-body{padding:14px 15px 15px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body><main>
 <header class="top">
  <div class="top-left">
-  <a href="#telecomando" id="back">← Telecomando</a>
-  <button id="remote-stop" hidden disabled>Interrompi</button>
+  <a href="/" id="back">← Telecomando</a>
  </div>
  <span class="brand" aria-hidden="true">Salotto<span>.</span></span>
 </header>
-
-<section id="remote-view" hidden aria-label="Telecomando durante la condivisione">
- <div class="status-box"><span class="status-dot" aria-hidden="true"></span><p id="remote-status" class="status-text" role="status" aria-live="polite"></p></div>
- <p class="note">Puoi usare il telecomando qui senza interrompere la condivisione. Uscendo da Safari, iOS può sospendere la trasmissione.</p>
- <iframe id="remote-frame" title="Telecomando TV"></iframe>
-</section>
 
 <div id="share-view">
  <div class="page-head">
@@ -187,10 +196,7 @@ video{width:100%;max-height:420px;background:#000;border-radius:var(--r-sm);bord
    </div>
 
    <div class="tv-bar">
-    <div class="tv-row">
-     <button id="open-tv" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Apri sulla TV</button>
-     <p id="tv-status" role="status" aria-live="polite">Il browser della TV si apre automaticamente quando serve.</p>
-    </div>
+    <p id="tv-status" role="status" aria-live="polite">Il browser della TV si apre automaticamente quando serve.</p>
     <details class="mini-drawer">
      <summary>Indirizzo del ricevitore</summary>
      <p><a id="receiver" target="_blank" rel="noopener"></a></p>
@@ -199,89 +205,105 @@ video{width:100%;max-height:420px;background:#000;border-radius:var(--r-sm);bord
   </section>
 
   <div class="stack">
-   <section class="card" aria-label="Impostazioni video">
-    <div class="card-head"><h2>Video</h2></div>
-    <div class="fields">
-     <label class="field wide">Modalità
-      <span class="select-wrap">
-       <select id="transport">
-        <option value="native" selected>Video nativo TV · massima fluidità</option>
-        <option value="native-app">Ricevitore Tizen · richiede installazione</option>
-        <option value="auto">Automatica · bassa latenza</option>
-        <option value="jpeg">Compatibile · immagini adattive</option>
-       </select>
-       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </span>
-      <span id="mode-hint" class="hint">Usa il lettore video della TV con audio sincronizzato (~10–12 s di buffer).</span>
-     </label>
-     <label class="field wide">Contenuto
-      <span class="select-wrap">
-       <select id="video-profile">
-        <option value="cinema" selected>Film e video · qualità elevata</option>
-        <option value="balanced">Desktop · testo nitido, meno banda</option>
-       </select>
-       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </span>
-     </label>
-     <label class="field">Risoluzione max
-      <span class="select-wrap">
-       <select id="width">
-        <option value="640">640 px</option>
-        <option value="960">960 px</option>
-        <option value="1280">1280 px · HD</option>
-        <option value="1920" selected>1920 px · Full HD</option>
-       </select>
-       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </span>
-     </label>
-     <label class="field">Immagini/s
-      <span class="select-wrap">
-       <select id="fps">
-        <option value="5">5 fps</option>
-        <option value="10">10 fps</option>
-        <option value="15">15 fps</option>
-        <option value="24">24 fps</option>
-        <option value="25">25 fps</option>
-        <option value="30">30 fps</option>
-        <option value="60" selected>60 fps</option>
-       </select>
-       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </span>
-     </label>
-    </div>
-    <details class="mini-drawer">
-     <summary>Dettagli su modalità e fluidità</summary>
-     <p class="note">Per i film puoi usare 24, 25 o 30 immagini/s secondo il contenuto. Full HD conserva più dettagli ma richiede più banda; su connessione debole passa a 1280 px. La frequenza scelta è un limite massimo: la modalità compatibile arriva fino a 30 immagini/s, H.264 fino a 60.</p>
-    </details>
-   </section>
-
-   <section class="card" aria-label="Impostazioni audio">
-    <div class="card-head"><h2>Audio</h2></div>
-    <label class="toggle-row">
-     <span class="toggle-copy">
-      <span class="toggle-title">Condividi anche l’audio</span>
-      <span class="toggle-sub">Riproduzione locale silenziata dal browser</span>
+   <details id="video-section" class="card collapsible">
+    <summary class="collapsible-head">
+     <span class="collapsible-title">
+      <h2>Video</h2>
+      <span id="video-summary" class="sect-summary">Video nativo TV · 1920 px · 60 fps</span>
      </span>
-     <input id="audio-enabled" type="checkbox" checked>
-    </label>
-    <div class="audio-row">
-     <label class="field">Qualità audio
-      <span class="select-wrap">
-       <select id="audio-quality">
-        <option value="music">Musica e video · stereo</option>
-        <option value="voice">Voce · mono, meno banda</option>
-       </select>
-       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </span>
-     </label>
-     <button id="select-audio" disabled>Audio da scheda…</button>
+     <span class="toggle-pill"><span class="label-show">Mostra</span><span class="label-hide">Nascondi</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+    </summary>
+    <div class="collapsible-body">
+     <div class="fields">
+      <label class="field wide">Modalità
+       <span class="select-wrap">
+        <select id="transport">
+         <option value="native" selected>Video nativo TV · massima fluidità</option>
+         <option value="native-app">Ricevitore Tizen · richiede installazione</option>
+         <option value="auto">Automatica · bassa latenza</option>
+         <option value="jpeg">Compatibile · immagini adattive</option>
+        </select>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+       </span>
+       <span id="mode-hint" class="hint">Usa il lettore video della TV con audio sincronizzato (~10–12 s di buffer).</span>
+      </label>
+      <label class="field wide">Contenuto
+       <span class="select-wrap">
+        <select id="video-profile">
+         <option value="cinema" selected>Film e video · qualità elevata</option>
+         <option value="balanced">Desktop · testo nitido, meno banda</option>
+        </select>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+       </span>
+      </label>
+      <label class="field">Risoluzione max
+       <span class="select-wrap">
+        <select id="width">
+         <option value="640">640 px</option>
+         <option value="960">960 px</option>
+         <option value="1280">1280 px · HD</option>
+         <option value="1920" selected>1920 px · Full HD</option>
+        </select>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+       </span>
+      </label>
+      <label class="field">Immagini/s
+       <span class="select-wrap">
+        <select id="fps">
+         <option value="5">5 fps</option>
+         <option value="10">10 fps</option>
+         <option value="15">15 fps</option>
+         <option value="24">24 fps</option>
+         <option value="25">25 fps</option>
+         <option value="30">30 fps</option>
+         <option value="60" selected>60 fps</option>
+        </select>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+       </span>
+      </label>
+     </div>
+     <details class="mini-drawer">
+      <summary>Dettagli su modalità e fluidità</summary>
+      <p class="note">Per i film puoi usare 24, 25 o 30 immagini/s secondo il contenuto. Full HD conserva più dettagli ma richiede più banda; su connessione debole passa a 1280 px. La frequenza scelta è un limite massimo: la modalità compatibile arriva fino a 30 immagini/s, H.264 fino a 60.</p>
+     </details>
     </div>
-    <p id="audio-status" role="status" aria-live="polite">Audio pronto, se incluso nella selezione del browser.</p>
-    <details class="mini-drawer">
-     <summary>Guida audio di sistema</summary>
-     <p class="note">Con «Schermo intero» attiva «Condividi audio del sistema» nel dialogo del browser; con una scheda attiva «Condividi audio della scheda». Il microfono non viene acquisito. Se l’audio di sistema non arriva, usa «Audio da scheda…» mantenendo il video attuale.</p>
-    </details>
-   </section>
+   </details>
+
+   <details id="audio-section" class="card collapsible">
+    <summary class="collapsible-head">
+     <span class="collapsible-title">
+      <h2>Audio</h2>
+      <span id="audio-summary" class="sect-summary">Attivo · Stereo</span>
+     </span>
+     <span class="toggle-pill"><span class="label-show">Mostra</span><span class="label-hide">Nascondi</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+    </summary>
+    <div class="collapsible-body">
+     <label class="toggle-row">
+      <span class="toggle-copy">
+       <span class="toggle-title">Condividi anche l’audio</span>
+       <span class="toggle-sub">Riproduzione locale silenziata dal browser</span>
+      </span>
+      <input id="audio-enabled" type="checkbox" checked>
+     </label>
+     <div class="audio-row">
+      <label class="field">Qualità audio
+       <span class="select-wrap">
+        <select id="audio-quality">
+         <option value="music">Musica e video · stereo</option>
+         <option value="voice">Voce · mono, meno banda</option>
+        </select>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+       </span>
+      </label>
+      <button id="select-audio" disabled>Audio da scheda…</button>
+     </div>
+     <p id="audio-status" role="status" aria-live="polite">Audio pronto, se incluso nella selezione del browser.</p>
+     <details class="mini-drawer">
+      <summary>Guida audio di sistema</summary>
+      <p class="note">Con «Schermo intero» attiva «Condividi audio del sistema» nel dialogo del browser; con una scheda attiva «Condividi audio della scheda». Il microfono non viene acquisito. Se l’audio di sistema non arriva, usa «Audio da scheda…» mantenendo il video attuale.</p>
+     </details>
+    </div>
+   </details>
   </div>
  </div>
 </div>
