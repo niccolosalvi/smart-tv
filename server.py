@@ -296,6 +296,7 @@ class Handler(BaseHTTPRequestHandler):
                 'active_app': active_app,
                 'active_app_name': APPS[active_app]['name'] if active_app in APPS else None,
                 'youtube_video_id': live.get('youtube_video_id'),
+                'youtube_progress': live.get('youtube_progress'),
                 'screen_active': screen_active,
                 'context': context,
                 'note': 'Stato alimentazione e app verificato via REST locale; lo stato di volume e canale non viene letto dalla TV'})

@@ -75,6 +75,8 @@ let initialPaused = false;
 let seekPreviewTimer = null;
 let pausePreviewTimer = null;
 let lastPreviewSeekAt = 0;
+let userScrubUntil = 0;
+let lastAutoSyncedSec = -1;
 
 function ytCommand(func, args = []) {
  if (!previewFrame || !previewFrame.contentWindow || !currentPreviewVideoId) return;
@@ -117,6 +119,7 @@ function syncYoutubePreview(videoId) {
  currentPreviewVideoId = videoId;
  previewDuration = 0;
  initialPaused = false;
+ lastAutoSyncedSec = -1;
  if (previewFrame) {
   const origin = encodeURIComponent(location.origin);
   previewFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&mute=1&autoplay=1&controls=0&rel=0&playsinline=1&origin=${origin}`;
@@ -126,6 +129,30 @@ function syncYoutubePreview(videoId) {
  updateSeekUI(Number(seekSlider?.value) || 0, true);
 }
 window.syncYoutubePreview = syncYoutubePreview;
+
+function syncYoutubeProgress(progress) {
+ if (!progress || typeof progress !== 'object') return;
+ if (progress.video_id) syncYoutubePreview(progress.video_id);
+ if (typeof progress.duration === 'number' && progress.duration > 0) {
+  const dur = Math.round(progress.duration);
+  if (dur !== previewDuration) {
+   previewDuration = dur;
+   if (seekSlider) seekSlider.max = String(dur);
+  }
+ }
+ const isEditing = Date.now() < userScrubUntil || document.activeElement === seekTimeInput;
+ if (!isEditing && typeof progress.current_time === 'number' && progress.current_time >= 0) {
+  const cur = Math.round(progress.current_time);
+  updateSeekUI(cur, true);
+  if (Math.abs(cur - lastAutoSyncedSec) >= 8) {
+   lastAutoSyncedSec = cur;
+   seekPreviewFrame(cur);
+  }
+ } else if (previewDuration > 0) {
+  updateSeekUI(Number(seekSlider?.value) || 0, false);
+ }
+}
+window.syncYoutubeProgress = syncYoutubeProgress;
 
 if (previewFrame) {
  previewFrame.addEventListener('load', () => {
@@ -170,6 +197,7 @@ if (previewToggle && previewWrap) {
 
 if (seekSlider) {
  seekSlider.addEventListener('input', () => {
+  userScrubUntil = Date.now() + 12000;
   const sec = Number(seekSlider.value) || 0;
   if (seekTimeInput) seekTimeInput.setCustomValidity('');
   updateSeekUI(sec, true);
@@ -180,6 +208,7 @@ if (seekSlider) {
 document.querySelectorAll('[data-yt-step]').forEach(btn => {
  btn.addEventListener('click', () => {
   if (!seekSlider) return;
+  userScrubUntil = Date.now() + 12000;
   const delta = Number(btn.dataset.ytStep) || 0;
   const maxVal = previewDuration > 0 ? previewDuration : (Number(seekSlider.max) || 3600);
   const next = Math.max(0, Math.min(maxVal, (Number(seekSlider.value) || 0) + delta));
@@ -191,6 +220,7 @@ document.querySelectorAll('[data-yt-step]').forEach(btn => {
 
 if (seekTimeInput) {
  seekTimeInput.addEventListener('input', () => {
+  userScrubUntil = Date.now() + 12000;
   seekTimeInput.setCustomValidity('');
   const parsed = parseSeekTime(seekTimeInput.value);
   if (parsed !== null) {
@@ -219,6 +249,8 @@ if (seekForm) {
    }
    return;
   }
+  userScrubUntil = 0;
+  lastAutoSyncedSec = parsed;
   updateSeekUI(parsed, true);
   await command({youtube_seek: parsed});
  });

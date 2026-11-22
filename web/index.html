@@ -625,7 +625,8 @@ async function refresh(){
    document.querySelector('#connection').textContent='TV in standby';
    document.querySelector('#tv-health').textContent='TV in standby / non raggiungibile';
   }
-  if(s.youtube_video_id&&typeof window.syncYoutubePreview==='function')window.syncYoutubePreview(s.youtube_video_id);
+  if(s.youtube_progress&&typeof window.syncYoutubeProgress==='function')window.syncYoutubeProgress(s.youtube_progress);
+  else if(s.youtube_video_id&&typeof window.syncYoutubePreview==='function')window.syncYoutubePreview(s.youtube_video_id);
   renderContext(s.context);
  }catch{
   document.querySelector('#connection').textContent='Server non raggiungibile';

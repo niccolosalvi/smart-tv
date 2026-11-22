@@ -72,6 +72,7 @@ class Remote:
         self._lounge_token_sid = None
         self._lounge_token_time = 0.0
         self._last_youtube_video_id = None
+        self._last_youtube_progress = None
         self._lounge_vid_check_time = 0.0
         self.tv = (ObservedTV if trace_events else SamsungTVWS)(host=HOST, port=PORT, timeout=timeout,
             name=os.environ.get('TV_CLIENT_NAME', 'Smart TV Locale'),
@@ -100,6 +101,7 @@ class Remote:
                 'active_app': None,
                 'running_apps': [],
                 'youtube_video_id': None,
+                'youtube_progress': None,
             }
             self._status_cache = result
             self._status_time = now
@@ -117,21 +119,28 @@ class Remote:
                     active_app = key
             except Exception:
                 continue
-        if active_app == 'youtube' and (self._last_youtube_video_id is None or now - self._lounge_vid_check_time >= 8.0):
+        if active_app == 'youtube' and (self._last_youtube_progress is None or now - self._lounge_vid_check_time >= 8.0):
             self._lounge_vid_check_time = now
             dial = self._read_youtube_dial(opener)
             if dial.get('sid'):
-                st = self._youtube_lounge_state(opener, dial['sid'])
+                st = self._youtube_lounge_state(opener, dial['sid'], include_progress=True)
                 if st:
                     vid = st.get('video_id') or st.get('first_video_id')
                     if vid:
                         self._last_youtube_video_id = vid
+                    self._last_youtube_progress = {
+                        'video_id': self._last_youtube_video_id,
+                        'current_time': st.get('current_time'),
+                        'duration': st.get('duration'),
+                        'state': st.get('state'),
+                    }
         result = {
             'tv_online': True,
             'power_state': 'on',
             'active_app': active_app,
             'running_apps': running_apps,
             'youtube_video_id': self._last_youtube_video_id if active_app == 'youtube' else None,
+            'youtube_progress': self._last_youtube_progress if active_app == 'youtube' else None,
         }
         self._status_cache = result
         self._status_time = now
@@ -266,12 +275,12 @@ class Remote:
         self._lounge_token_time = now
         return self._lounge_token
 
-    def _youtube_lounge_state(self, opener, screen_id):
+    def _youtube_lounge_state(self, opener, screen_id, include_progress=False):
         try:
             lounge_token = self._get_lounge_token(opener, screen_id)
             if not lounge_token:
                 return None
-            params = urlencode({
+            base_params = {
                 'device': 'REMOTE_CONTROL',
                 'id': '12345678-9abc-4def-8123-456789abcdef',
                 'name': 'SmartTVLocale',
@@ -279,8 +288,11 @@ class Remote:
                 'mdx-version': '3',
                 'VER': '8',
                 'v': '2',
-                'RID': '1',
                 'CVER': '1',
+            }
+            params = urlencode({
+                **base_params,
+                'RID': '1',
                 'zx': str(int(time.time() * 1000)),
                 't': '1',
             })
@@ -301,13 +313,55 @@ class Remote:
             fvid = re.search(r'"firstVideoId"\s*:\s*"([^"]+)"', bind_text)
             c_sid = re.search(r'\["c","([^"]+)"', bind_text)
             g_ses = re.search(r'\["S","([^"]+)"', bind_text)
-            return {
+            info = {
                 'video_id': vid.group(1) if vid else None,
                 'first_video_id': fvid.group(1) if fvid else None,
                 'sid': c_sid.group(1) if c_sid else None,
                 'gsessionid': g_ses.group(1) if g_ses else None,
                 'lounge_token': lounge_token,
+                'current_time': None,
+                'duration': None,
+                'state': None,
             }
+            if include_progress and info['sid'] and info['gsessionid']:
+                get_params = urlencode({
+                    **base_params,
+                    'SID': info['sid'],
+                    'gsessionid': info['gsessionid'],
+                    'RID': 'rpc',
+                    'CI': '0',
+                    'AID': '0',
+                    'TYPE': 'xmlhttp',
+                    'zx': str(int(time.time() * 1000)),
+                    't': '1',
+                })
+                get_req = urllib.request.Request(
+                    f'https://www.youtube.com/api/lounge/bc/bind?{get_params}',
+                    headers={'X-YouTube-LoungeId-Token': lounge_token},
+                    method='GET')
+                lines = []
+                with opener.open(get_req, timeout=2.0) as rpc_resp:
+                    for _ in range(25):
+                        line = rpc_resp.fp.readline()
+                        if not line:
+                            break
+                        s = line.decode('utf-8', 'replace')
+                        lines.append(s)
+                        if 'nowPlaying' in s or 'onStateChange' in s or s.strip() == ']':
+                            break
+                rpc_text = ''.join(lines)
+                np_match = re.search(r'\["(?:nowPlaying|onStateChange)"\s*,\s*(\{[^\]]+\})\]', rpc_text)
+                if np_match:
+                    np = json.loads(np_match.group(1))
+                    if np.get('videoId'):
+                        info['video_id'] = np['videoId']
+                    if np.get('currentTime') is not None:
+                        info['current_time'] = max(0, int(round(float(np['currentTime']))))
+                    if np.get('duration') is not None:
+                        info['duration'] = max(0, int(round(float(np['duration']))))
+                    if np.get('state') is not None:
+                        info['state'] = int(np['state'])
+            return info
         except Exception:
             return None
 
@@ -410,6 +464,10 @@ class Remote:
                 http_status = self._youtube_lounge_seek(opener, dial['sid'], sec)
                 if http_status is None:
                     raise RuntimeError('YouTubeLoungeUnavailable')
+                if isinstance(self._last_youtube_progress, dict):
+                    self._last_youtube_progress = {**self._last_youtube_progress, 'current_time': sec}
+                self._lounge_vid_check_time = 0.0
+                self.invalidate_status_cache()
                 return record('youtube:seek', started, 'sent', transport='lounge',
                               http_status=http_status, seconds=sec,
                               note=f'Salto a {sec // 60}:{sec % 60:02d} inviato a YouTube sulla TV')
