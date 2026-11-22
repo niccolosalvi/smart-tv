@@ -65,8 +65,8 @@ class NativeTV:
 
 class NativeSession:
     """Bounded MP4 input -> lossless MPEG-TS remux -> one TV HTTP reader."""
-    max_chunk = 2*1024*1024
-    max_buffer = 16*1024*1024
+    max_chunk = 4*1024*1024
+    max_buffer = 48*1024*1024
 
     def __init__(self, tv, base_url, executable='ffmpeg', launcher=None):
         self.id = secrets.token_urlsafe(24)
@@ -175,7 +175,7 @@ class NativeSession:
                 self.condition.wait_for(lambda:self.closed or self.end>0,timeout=12)
                 if self.closed:return
                 if not self.end:raise RuntimeError('Nessun video dal codificatore')
-                self.condition.wait_for(lambda:self.closed or (self.video_frames>0 and self.end>=131072),timeout=0.75)
+                self.condition.wait_for(lambda:self.closed or (self.video_frames>0 and self.end>=524288),timeout=1.5)
             if self.closed:return
             if self.launcher:
                 self.launcher(self.url)

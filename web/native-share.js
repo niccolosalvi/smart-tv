@@ -3,7 +3,8 @@
 class ScreenNativeSender{
  constructor(config,onStatus,onError){
   this.config=config;this.onStatus=onStatus;this.onError=onError;
-  this.id=null;this.recorder=null;this.stopped=false;this.queued=0;this.chain=Promise.resolve();this.timer=null;
+  this.id=null;this.recorder=null;this.stopped=false;this.queued=0;this.pending=[];this.sending=false;this.chain=Promise.resolve();this.timer=null;
+  this.maxQueue=24*1024*1024;this.chunkSize=1024*1024;
  }
  async request(path,body,keepalive=false){
   const response=await fetch(this.config.server+path,{method:'POST',
@@ -21,27 +22,43 @@ class ScreenNativeSender{
   const track=stream.getVideoTracks()[0],settings=track.getSettings();
   const w=settings.width||options.width,h=settings.height||Math.round(options.width*9/16),fps=Math.round(settings.frameRate||options.fps);
   this.label=w+'×'+h+' · cattura '+fps+' immagini/s';
-  const videoBps=Math.round(Math.max(2500000,Math.min(12000000,(w*h*fps*.10)||6000000)));
-  this.recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:videoBps,audioBitsPerSecond:128000,videoKeyFrameIntervalDuration:1000});
+  const videoBps=Math.round(Math.max(2500000,Math.min(8000000,(w*h*fps*.065)||5000000)));
+  this.recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:videoBps,audioBitsPerSecond:128000,videoKeyFrameIntervalDuration:2000});
   this.recorder.ondataavailable=event=>{
    if(this.stopped||!event.data.size)return;
-   if(this.queued+event.data.size>8*1024*1024){this.fail(Error('La rete non tiene il passo del video. Riduci la frequenza o la risoluzione.'));return;}
+   if(this.queued+event.data.size>this.maxQueue){this.fail(Error('La rete non tiene il passo del video. Riduci la frequenza o la risoluzione.'));return;}
    this.queued+=event.data.size;
-   this.chain=this.chain.then(async()=>{
-    try{
-     // Recorder delivery boundaries need not match the requested timeslice.
-     // Split large keyframes while preserving the original MP4 byte order.
-     for(let offset=0;offset<event.data.size&&!this.stopped;offset+=512*1024)
-      await this.request('/api/native/'+this.id+'/chunk',event.data.slice(offset,offset+512*1024));
-    }
-    finally{this.queued-=event.data.size;}
-   }).catch(error=>this.fail(error));
+   this.pending.push(event.data);
+   if(!this.sending)this.chain=this.drain();
   };
   this.recorder.onerror=event=>this.fail(event.error||Error('Codifica video interrotta'));
   this.recorder.onstop=()=>{if(!this.stopped)this.fail(Error('Il codificatore ha terminato il video'));};
-  this.recorder.start(250);
+  this.recorder.start(500);
   this.onStatus('Video nativo · '+this.label+' · preparazione del buffer…');
   this.timer=setInterval(()=>this.poll(),1000);
+ }
+ async drain(){
+  this.sending=true;
+  try{
+   while(this.pending.length&&!this.stopped){
+    const batch=[this.pending.shift()];let bytes=batch[0].size;
+    while(this.pending.length&&bytes+this.pending[0].size<=this.chunkSize){
+     const next=this.pending.shift();batch.push(next);bytes+=next.size;
+    }
+    const blob=batch.length===1?batch[0]:new Blob(batch,{type:'video/mp4'});
+    // Split large keyframes while preserving the original MP4 byte order.
+    for(let offset=0;offset<blob.size&&!this.stopped;offset+=this.chunkSize){
+     const slice=blob.slice(offset,offset+this.chunkSize);
+     try{await this.request('/api/native/'+this.id+'/chunk',slice);}
+     finally{this.queued=Math.max(0,this.queued-slice.size);}
+    }
+   }
+  }catch(error){
+   this.queued=0;this.pending.length=0;this.fail(error);
+  }finally{
+   if(this.stopped){this.queued=0;this.pending.length=0;}
+   this.sending=false;
+  }
  }
  async poll(){
   if(this.stopped||this.polling)return;this.polling=true;
@@ -55,7 +72,7 @@ class ScreenNativeSender{
  }
  fail(error){if(this.stopped)return;this.onError(error);}
  async stop(keepalive=false){
-  if(this.stopped)return;this.stopped=true;clearInterval(this.timer);
+  if(this.stopped)return;this.stopped=true;this.queued=0;this.pending.length=0;clearInterval(this.timer);
   if(this.recorder&&this.recorder.state!=='inactive')this.recorder.stop();
   if(this.id)await this.request('/api/native/'+this.id+'/stop','{}',keepalive);
  }

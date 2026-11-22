@@ -58,7 +58,7 @@ class Handler(BaseHTTPRequestHandler):
     def setup(self):
         super().setup()
         try:
-            self.connection.settimeout(15)
+            self.connection.settimeout(30)
             self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except OSError:
             pass
@@ -173,7 +173,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Connection','close')
         self.send_header('transferMode.dlna.org','Streaming')
         self.send_header('contentFeatures.dlna.org','DLNA.ORG_OP=00;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000')
-        self.end_headers();self.close_connection=True;self.connection.settimeout(8)
+        self.end_headers();self.close_connection=True;self.connection.settimeout(30)
         if session.launcher:session.transport='APP_STREAMING'
         try:
             for data in session.stream():self.wfile.write(data);self.wfile.flush()
@@ -201,7 +201,7 @@ class Handler(BaseHTTPRequestHandler):
     def native_post(self):
         try:
             length=int(self.headers.get('Content-Length','0'))
-            if not 0<length<=2*1024*1024:raise ValueError('Dimensione video non valida')
+            if not 0<length<=4*1024*1024:raise ValueError('Dimensione video non valida')
             parts=self.path.split('/')
             if self.path=='/api/native/start':
                 if length>2048:raise ValueError('Richiesta troppo grande')
@@ -290,6 +290,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.request_started = time.perf_counter()
+        if self.path.startswith('/api/native/') and self.path.endswith('/chunk'):
+            self.correlation = None
+            self._handle_post()
+            return
         proposed = self.headers.get('X-Request-ID', '')
         self.correlation = proposed if re.fullmatch(r'[a-zA-Z0-9-]{8,64}', proposed) else uuid.uuid4().hex[:16]
         token = request_id.set(self.correlation)
