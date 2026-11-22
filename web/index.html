@@ -63,9 +63,24 @@ h1 span{color:var(--dim)}
 h2{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0}
 .compact-info{color:var(--dim);font-size:11.5px;line-height:1.45;margin:6px 0 0}
 
-/* YouTube Search & Direct Link */
+/* YouTube Search, Direct Link & Seek Preview */
 .search-label{display:block;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
 .yt-url-form{margin-bottom:12px}
+.yt-seek-box{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.yt-seek-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.yt-seek-head-right{display:flex;align-items:center;gap:8px}
+.yt-seek-readout{font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;background:var(--surface-2);border:1px solid var(--line-2);border-radius:6px;padding:2px 8px}
+.yt-preview-toggle{min-height:26px;height:26px;padding:0 9px;font-size:11px;border-radius:6px;color:var(--muted);background:var(--surface)}
+.yt-preview-wrap{position:relative;width:100%;aspect-ratio:16/9;background:#050506;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.yt-preview-wrap[hidden]{display:none!important}
+.yt-preview-frame{width:100%;height:100%;border:0;display:block;background:#000}
+.yt-preview-frame[hidden]{display:none!important}
+.yt-preview-empty{padding:14px;text-align:center;font-size:11.5px;color:var(--dim);line-height:1.45}
+.yt-seek-slider{width:100%;height:28px;padding:0;background:transparent;border:0;accent-color:var(--white);cursor:pointer}
+.yt-seek-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.yt-seek-steps button{min-height:32px;font-size:12px;font-weight:550;font-variant-numeric:tabular-nums}
+.yt-seek-form{grid-template-columns:96px minmax(0,1fr)}
+.yt-seek-form input{text-align:center;font-variant-numeric:tabular-nums;font-weight:600;padding:0 8px}
 form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:0}
 input,select.field-select{width:100%;min-width:0;height:40px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:0 12px;font-size:14px;color:var(--text)}
 input::placeholder{font-size:12.5px;color:var(--dim)}
@@ -287,7 +302,32 @@ footer{display:flex;justify-content:space-between;align-items:center;color:var(-
 <input id="youtube-query" type="search" maxlength="128" placeholder="Cerca un video sulla TV" aria-label="Cerca un video sulla TV" aria-describedby="youtube-search-note" enterkeyhint="search" required>
 <button type="submit">Cerca</button>
 </form>
-<p id="youtube-search-note" class="compact-info">Con un link la TV apre YouTube, preme OK sul profilo e avvia direttamente il video. Con Cerca apre i risultati nell’app.</p>
+<p id="youtube-search-note" class="compact-info">Con un link il video si avvia direttamente su YouTube sulla TV. Con Cerca apre i risultati nell’app.</p>
+
+<div id="youtube-seek-box" class="yt-seek-box" aria-label="Salta al minuto YouTube">
+<div class="yt-seek-head">
+<label for="youtube-seek-slider" class="search-label" style="margin:0">Salta al minuto</label>
+<div class="yt-seek-head-right">
+<span id="youtube-seek-readout" class="yt-seek-readout">00:00 / --:--</span>
+<button type="button" id="youtube-preview-toggle" class="yt-preview-toggle" aria-expanded="true">Nascondi anteprima</button>
+</div>
+</div>
+<div id="youtube-preview-wrap" class="yt-preview-wrap">
+<iframe id="youtube-preview-frame" class="yt-preview-frame" title="Anteprima muta video YouTube" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media" hidden></iframe>
+<div id="youtube-preview-empty" class="yt-preview-empty">Incolla o avvia un link YouTube (oppure attendi il rilevamento automatico dalla TV) per vedere qui l’anteprima del fotogramma mentre muovi lo slider.</div>
+</div>
+<input id="youtube-seek-slider" class="yt-seek-slider" type="range" min="0" max="3600" step="1" value="0" aria-label="Cursore minutaggio video YouTube">
+<div class="yt-seek-steps" role="group" aria-label="Spostamento rapido minutaggio">
+<button type="button" data-yt-step="-60">−1m</button>
+<button type="button" data-yt-step="-10">−10s</button>
+<button type="button" data-yt-step="10">+10s</button>
+<button type="button" data-yt-step="60">+1m</button>
+</div>
+<form id="youtube-seek-form" class="yt-seek-form" autocomplete="off">
+<input id="youtube-seek-time" type="text" inputmode="numeric" maxlength="8" value="00:00" placeholder="MM:SS" aria-label="Minutaggio esatto (MM:SS o HH:MM:SS)">
+<button type="submit" id="youtube-seek-submit">Vai a 00:00 sulla TV</button>
+</form>
+</div>
 </section>
 <p id="app-search-unavailable" class="compact-info" hidden>Su questa TV la ricerca da PC o smartphone è disponibile solo per YouTube. Per questa app usa la ricerca sulla TV.</p>
 
@@ -585,6 +625,7 @@ async function refresh(){
    document.querySelector('#connection').textContent='TV in standby';
    document.querySelector('#tv-health').textContent='TV in standby / non raggiungibile';
   }
+  if(s.youtube_video_id&&typeof window.syncYoutubePreview==='function')window.syncYoutubePreview(s.youtube_video_id);
   renderContext(s.context);
  }catch{
   document.querySelector('#connection').textContent='Server non raggiungibile';
@@ -621,7 +662,7 @@ async function refreshHealth(){
 }
 document.querySelector('#check-health').addEventListener('click',()=>{refreshHealth();refresh()});
 document.querySelector('#reload-page').addEventListener('click',()=>{if(!pending)location.reload()});
-function describe(payload){if(Object.hasOwn(payload,'youtube_url'))return 'Avvio link YouTube · URL escluso dai log';if(Object.hasOwn(payload,'youtube_search'))return 'Ricerca YouTube · query esclusa dai log';if(payload.screen)return 'Apri schermo PC nel browser TV';if(payload.source)return 'Apri PC · HDMI 1';if(payload.volume)return 'Volume '+(payload.volume>0?'+':'')+payload.volume;if(payload.key)return payload.key;if(payload.channel)return 'Canale '+payload.channel;if(payload.app)return 'Apri '+names[payload.app];if(payload.power)return payload.power==='on'?'Accendi (Wake-on-LAN)':'Spegni (Power breve)';return 'Vista '+(names[payload.context]||'completa')}
+function describe(payload){if(Object.hasOwn(payload,'youtube_seek'))return 'Salto YouTube a '+Math.floor(payload.youtube_seek/60)+':'+String(payload.youtube_seek%60).padStart(2,'0');if(Object.hasOwn(payload,'youtube_url'))return 'Avvio link YouTube · URL escluso dai log';if(Object.hasOwn(payload,'youtube_search'))return 'Ricerca YouTube · query esclusa dai log';if(payload.screen)return 'Apri schermo PC nel browser TV';if(payload.source)return 'Apri PC · HDMI 1';if(payload.volume)return 'Volume '+(payload.volume>0?'+':'')+payload.volume;if(payload.key)return payload.key;if(payload.channel)return 'Canale '+payload.channel;if(payload.app)return 'Apri '+names[payload.app];if(payload.power)return payload.power==='on'?'Accendi (Wake-on-LAN)':'Spegni (Power breve)';return 'Vista '+(names[payload.context]||'completa')}
 // Correlation IDs are not credentials. randomUUID is unavailable on HTTP LAN
 // pages in some mobile browsers; keep command dispatch working there too.
 function newRequestId(){return typeof globalThis.crypto?.randomUUID==='function'?globalThis.crypto.randomUUID():'web-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
@@ -629,8 +670,8 @@ async function command(payload){
  const description=describe(payload);
  if(pending){logLine('Browser','Clic ignorato: comando già in corso · '+description,{level:'warning'});return}
  const id=newRequestId();pending=true;
- document.querySelectorAll('button[data-key],button[data-channel],button[data-app],button[data-power],button[data-volume],button[data-input],button[data-screen],#channel-form button,#youtube-search-form button,#youtube-url-form button,select').forEach(b=>{b.setAttribute('aria-disabled','true')});
- status.textContent=payload.context?'Cambio vista…':Object.hasOwn(payload,'youtube_url')?'Apertura YouTube, selezione profilo (OK) e avvio video…':'Invio alla TV…';
+ document.querySelectorAll('button[data-key],button[data-channel],button[data-app],button[data-power],button[data-volume],button[data-input],button[data-screen],#channel-form button,#youtube-search-form button,#youtube-url-form button,#youtube-seek-form button,[data-yt-step],select').forEach(b=>{b.setAttribute('aria-disabled','true')});
+ status.textContent=payload.context?'Cambio vista…':Object.hasOwn(payload,'youtube_url')?'Avvio video su YouTube…':Object.hasOwn(payload,'youtube_seek')?'Salto al minuto richiesto su YouTube…':'Invio alla TV…';
  logLine('Browser → Server',description+' · invio HTTP',{request_id:id});
  const start=performance.now();
  try{
@@ -642,7 +683,8 @@ async function command(payload){
   logLine('Browser','Ricevuto HTTP '+response.status+' · totale '+roundtrip+' ms · server '+(data.server_elapsed_ms??'?')+' ms',{request_id:id,level:response.ok?'info':'error'});
   renderContext(data.context);
   if(!response.ok)throw Error(data.error+(data.hint?' · '+data.hint:''));
-  if(Object.hasOwn(payload,'youtube_url')){status.textContent=data.profile_confirmed===false?'YouTube già nel profilo attivo: video avviato direttamente sulla TV.':'YouTube aperto, schermata profilo rilevata (OK inviato) e video avviato sulla TV.'}
+  if(Object.hasOwn(payload,'youtube_seek')){status.textContent=data.note||'Posizione video aggiornata su YouTube.'}
+  else if(Object.hasOwn(payload,'youtube_url')){status.textContent=data.profile_confirmed===false?'YouTube già nel profilo attivo: video avviato direttamente sulla TV.':'YouTube aperto, schermata profilo rilevata (OK inviato) e video avviato sulla TV.'}
   else if(Object.hasOwn(payload,'youtube_search')){status.textContent=data.status==='demo'?'Demo: nessuna ricerca inviata alla TV.':'Ricerca inviata a YouTube sulla TV. Usa le frecce per scegliere un video.'}
   else if(payload.context){status.textContent='Vista aggiornata. Nessun comando inviato alla TV.'}
   else if(payload.screen){status.textContent='Apertura del ricevitore richiesta sulla TV. Caricamento pagina non confermato.'}

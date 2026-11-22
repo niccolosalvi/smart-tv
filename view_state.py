@@ -46,7 +46,7 @@ class ViewState:
             return self.get()
 
     def after_command(self, payload):
-        if 'youtube_search' in payload or 'youtube_url' in payload:
+        if 'youtube_search' in payload or 'youtube_url' in payload or 'youtube_seek' in payload:
             return self.select('youtube', 'last_request')
         if payload.get('screen') == 'stop':
             return self.select('unknown', 'unconfirmed')

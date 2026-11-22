@@ -14,7 +14,12 @@ from urllib.parse import urlencode, urlsplit
 
 from samsungtvws import SamsungTVWS
 from diagnostics import timeline, tv_event
-from text_input import extract_youtube_video_id, youtube_search_payload, youtube_video_payload
+from text_input import (
+    extract_youtube_video_id,
+    validate_youtube_seek,
+    youtube_search_payload,
+    youtube_video_payload,
+)
 
 logging.getLogger('samsungtvws').setLevel(logging.CRITICAL)
 logging.getLogger('websocket').setLevel(logging.CRITICAL)
@@ -66,6 +71,8 @@ class Remote:
         self._lounge_token = None
         self._lounge_token_sid = None
         self._lounge_token_time = 0.0
+        self._last_youtube_video_id = None
+        self._lounge_vid_check_time = 0.0
         self.tv = (ObservedTV if trace_events else SamsungTVWS)(host=HOST, port=PORT, timeout=timeout,
             name=os.environ.get('TV_CLIENT_NAME', 'Smart TV Locale'),
             token_file=str(STATE / 'tv-token'), key_press_delay=0.35)
@@ -87,7 +94,13 @@ class Remote:
                     raise OSError('HTTP ' + str(response.status))
                 json.load(response)
         except Exception:
-            result = {'tv_online': False, 'power_state': 'standby', 'active_app': None, 'running_apps': []}
+            result = {
+                'tv_online': False,
+                'power_state': 'standby',
+                'active_app': None,
+                'running_apps': [],
+                'youtube_video_id': None,
+            }
             self._status_cache = result
             self._status_time = now
             return result.copy()
@@ -104,7 +117,22 @@ class Remote:
                     active_app = key
             except Exception:
                 continue
-        result = {'tv_online': True, 'power_state': 'on', 'active_app': active_app, 'running_apps': running_apps}
+        if active_app == 'youtube' and (self._last_youtube_video_id is None or now - self._lounge_vid_check_time >= 8.0):
+            self._lounge_vid_check_time = now
+            dial = self._read_youtube_dial(opener)
+            if dial.get('sid'):
+                st = self._youtube_lounge_state(opener, dial['sid'])
+                if st:
+                    vid = st.get('video_id') or st.get('first_video_id')
+                    if vid:
+                        self._last_youtube_video_id = vid
+        result = {
+            'tv_online': True,
+            'power_state': 'on',
+            'active_app': active_app,
+            'running_apps': running_apps,
+            'youtube_video_id': self._last_youtube_video_id if active_app == 'youtube' else None,
+        }
         self._status_cache = result
         self._status_time = now
         return result.copy()
@@ -326,6 +354,69 @@ class Remote:
         except Exception:
             return None
 
+    def _youtube_lounge_seek(self, opener, screen_id, seconds):
+        try:
+            st = self._youtube_lounge_state(opener, screen_id)
+            if not st or not st.get('sid') or not st.get('gsessionid'):
+                return None
+            params = urlencode({
+                'device': 'REMOTE_CONTROL',
+                'id': '12345678-9abc-4def-8123-456789abcdef',
+                'name': 'SmartTVLocale',
+                'app': 'youtube-desktop',
+                'mdx-version': '3',
+                'VER': '8',
+                'v': '2',
+                'CVER': '1',
+                'SID': st['sid'],
+                'gsessionid': st['gsessionid'],
+                'RID': '2',
+                'AID': '1',
+                'zx': str(int(time.time() * 1000)),
+                't': '1',
+            })
+            cmd_body = urlencode({
+                'count': '1',
+                'ofs': '0',
+                'req0__sc': 'seekTo',
+                'req0_newTime': str(int(seconds)),
+            }).encode('utf-8')
+            req = urllib.request.Request(
+                f'https://www.youtube.com/api/lounge/bc/bind?{params}',
+                data=cmd_body,
+                headers={
+                    'X-YouTube-LoungeId-Token': st['lounge_token'],
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                method='POST')
+            timeline.emit('Server → TV', f'Lounge seekTo YouTube: {int(seconds)} s')
+            with opener.open(req, timeout=2.5) as response:
+                vid = st.get('video_id') or st.get('first_video_id')
+                if vid:
+                    self._last_youtube_video_id = vid
+                return response.status
+        except Exception:
+            return None
+
+    def seek_youtube(self, seconds):
+        sec = validate_youtube_seek(seconds)
+        with self.lock:
+            started = time.perf_counter()
+            try:
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                dial = self._read_youtube_dial(opener)
+                if dial.get('state') != 'running' or not dial.get('sid'):
+                    raise RuntimeError('YouTubeNotRunning')
+                http_status = self._youtube_lounge_seek(opener, dial['sid'], sec)
+                if http_status is None:
+                    raise RuntimeError('YouTubeLoungeUnavailable')
+                return record('youtube:seek', started, 'sent', transport='lounge',
+                              http_status=http_status, seconds=sec,
+                              note=f'Salto a {sec // 60}:{sec % 60:02d} inviato a YouTube sulla TV')
+            except Exception as exc:
+                record('youtube:seek', started, 'error', error_type=type(exc).__name__)
+                raise RuntimeError(type(exc).__name__) from None
+
     def _send_enter_reliable(self):
         for attempt in range(2):
             try:
@@ -398,6 +489,8 @@ class Remote:
                                 self._youtube_lounge_play(opener, cur_dial['sid'], video_id)
                         else:
                             self._yt_confirmed_psid = cur_dial.get('psid')
+                        self._last_youtube_video_id = video_id
+                        self._lounge_vid_check_time = time.monotonic()
                         self.invalidate_status_cache()
                         return record('youtube:play', started, 'sent', transport=transport,
                                       http_status=http_status, visible=True,
@@ -451,6 +544,8 @@ class Remote:
                     http_status = send_dial()
                     transport = 'rest+ws+dial'
 
+                self._last_youtube_video_id = video_id
+                self._lounge_vid_check_time = time.monotonic()
                 self.invalidate_status_cache()
                 return record('youtube:play', started, 'sent', transport=transport,
                               http_status=http_status, visible=visible,

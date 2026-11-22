@@ -55,3 +55,16 @@ def extract_youtube_video_id(value):
 
 def youtube_video_payload(value):
     return urlencode({'v': extract_youtube_video_id(value)}).encode('ascii')
+
+
+MAX_SEEK_SECONDS = 86400
+
+
+def validate_youtube_seek(value):
+    if (isinstance(value, bool) or not isinstance(value, (int, float)) or
+            (isinstance(value, float) and not value.is_integer())):
+        raise ValueError('Minutaggio non valido: inserisci un numero intero di secondi')
+    seconds = int(value)
+    if not 0 <= seconds <= MAX_SEEK_SECONDS:
+        raise ValueError(f'Minutaggio fuori intervallo (0–{MAX_SEEK_SECONDS} secondi)')
+    return seconds

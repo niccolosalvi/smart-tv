@@ -6,7 +6,13 @@ from urllib.parse import parse_qs
 
 from diagnostics import Timeline
 from remote import Remote
-from text_input import extract_youtube_video_id, validate_query, youtube_search_payload, youtube_video_payload
+from text_input import (
+    extract_youtube_video_id,
+    validate_query,
+    validate_youtube_seek,
+    youtube_search_payload,
+    youtube_video_payload,
+)
 
 
 class SearchInputTests(unittest.TestCase):
@@ -52,6 +58,15 @@ class SearchInputTests(unittest.TestCase):
         ]:
             with self.subTest(bad=repr(bad)), self.assertRaises(ValueError):
                 extract_youtube_video_id(bad)
+
+
+    def test_validates_youtube_seek_bounds_and_rejects_non_integers(self):
+        self.assertEqual(validate_youtube_seek(0), 0)
+        self.assertEqual(validate_youtube_seek(390), 390)
+        self.assertEqual(validate_youtube_seek(86400), 86400)
+        for bad in [None, True, False, '120', -1, 86401, 12.5, [], {}]:
+            with self.subTest(bad=repr(bad)), self.assertRaises(ValueError):
+                validate_youtube_seek(bad)
 
 
 class SearchTransportTests(unittest.TestCase):
@@ -154,6 +169,17 @@ class SearchTransportTests(unittest.TestCase):
         self.assertTrue(result['profile_confirmed'])
         self.remote.tv.send_key.assert_called_once_with('KEY_ENTER')
         self.opener.open.assert_not_called()
+
+    def test_seek_youtube_sends_lounge_seek_command(self):
+        self.remote._read_youtube_dial = Mock(return_value={
+            'state': 'running', 'oisi': 'null', 'ts': '123',
+            'psid': 'psid-active-1', 'sid': 'screen-1',
+        })
+        self.remote._youtube_lounge_seek = Mock(return_value=200)
+        result = self.remote.seek_youtube(390)
+        self.assertEqual((result['status'], result['transport'], result['seconds']),
+                         ('sent', 'lounge', 390))
+        self.remote._youtube_lounge_seek.assert_called_once_with(self.opener, 'screen-1', 390)
 
 
 if __name__ == '__main__':

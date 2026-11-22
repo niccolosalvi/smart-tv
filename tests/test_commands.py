@@ -40,6 +40,7 @@ class CommandTests(unittest.TestCase):
         self.transport.close_screen.return_value = {'status': 'sent'}
         self.transport.search_youtube.return_value = {'status': 'sent', 'transport': 'dial'}
         self.transport.play_youtube_url.return_value = {'status': 'sent', 'transport': 'rest+ws+dial'}
+        self.transport.seek_youtube.return_value = {'status': 'sent', 'transport': 'lounge', 'seconds': 390}
         for name, value in [('remote', self.transport),
                             ('view', ViewState(Path(folder.name)/'view.json'))]:
             p = patch.object(server, name, value)
@@ -122,6 +123,16 @@ class CommandTests(unittest.TestCase):
         for bad in ['', 'https://evil.example/watch?v=dQw4w9WgXcQ', 123, None]:
             self.assertEqual(self.post({'youtube_url': bad})[0], 400)
         self.assertEqual(self.transport.play_youtube_url.call_count, 1)
+
+    def test_youtube_seek_validates_and_dispatches_to_remote(self):
+        server.view.select('tv')
+        code, data = self.post({'youtube_seek': 390})
+        self.assertEqual(code, 200)
+        self.assertEqual(data['context']['source'], 'youtube')
+        self.transport.seek_youtube.assert_called_once_with(390)
+        for bad in [-1, 86401, True, '390', None, []]:
+            self.assertEqual(self.post({'youtube_seek': bad})[0], 400)
+        self.assertEqual(self.transport.seek_youtube.call_count, 1)
 
     def test_pc_switch_selects_pc_context(self):
         code, data = self.post({'source': 'pc'})

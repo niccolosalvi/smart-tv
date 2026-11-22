@@ -22,7 +22,7 @@ from epg import Guide
 from health import Health
 from screen_share import ShareRelay
 from sharing_pages import render_share
-from text_input import extract_youtube_video_id, validate_query
+from text_input import extract_youtube_video_id, validate_query, validate_youtube_seek
 from ios_setup import load_profile, setup_page
 from native_video import NativeCast
 
@@ -97,6 +97,8 @@ class Handler(BaseHTTPRequestHandler):
         # The 2016 TV browser cannot be assumed to understand nonce sources.
         # Its receiver uses a static same-origin script, supported by CSP1 too.
         path = urlsplit(self.path).path
+        if path in ('/', '/remote-panel'):
+            share_csp = "; frame-src https://www.youtube.com https://www.youtube-nocookie.com; img-src 'self' data: https://i.ytimg.com"
         script_policy = "'self'" if path in ('/share', '/screen') or path in SCRIPT_ASSETS else "'nonce-" + CSRF + "'"
         ancestors = "'self'" if remote_panel else "'none'"
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src " + script_policy + "; style-src 'unsafe-inline'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'" + share_csp)
@@ -293,6 +295,7 @@ class Handler(BaseHTTPRequestHandler):
                 'power_state': live.get('power_state', 'standby'),
                 'active_app': active_app,
                 'active_app_name': APPS[active_app]['name'] if active_app in APPS else None,
+                'youtube_video_id': live.get('youtube_video_id'),
                 'screen_active': screen_active,
                 'context': context,
                 'note': 'Stato alimentazione e app verificato via REST locale; lo stato di volume e canale non viene letto dalla TV'})
@@ -358,6 +361,12 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     return self.reply(400, {'error': str(exc)})
                 keys, action = [], 'youtube:play'
+            elif 'youtube_seek' in data:
+                try:
+                    validate_youtube_seek(data['youtube_seek'])
+                except ValueError as exc:
+                    return self.reply(400, {'error': str(exc)})
+                keys, action = [], 'youtube:seek'
             elif 'screen' in data:
                 if data['screen'] not in ('open', 'stop'):
                     raise ValueError('Azione schermo non consentita')
@@ -408,6 +417,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = remote.search_youtube(data['youtube_search'])
             elif 'youtube_url' in data:
                 result = remote.play_youtube_url(data['youtube_url'])
+            elif 'youtube_seek' in data:
+                result = remote.seek_youtube(data['youtube_seek'])
             elif 'screen' in data:
                 if data['screen'] == 'open':
                     if sharing.viewer is not None:
