@@ -1,86 +1,296 @@
 <!doctype html>
 <html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#09090b"><link rel="icon" href="data:,"><title>Condividi schermo · Salotto</title>
 <style>
-/* Condivisione dal PC — stile minimal monocromatico */
-:root{color-scheme:dark;--bg:#09090b;--surface:#111113;--surface-2:#18181b;--line:#1f1f23;--line-2:#2c2c31;--text:#fafafa;--text-2:#d4d4d8;--muted:#a1a1aa;--dim:#71717a;--white:#fafafa;--white-ink:#09090b;--danger:#f87171;--r:12px;--r-sm:8px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;background:var(--bg);color:var(--text)}
+/* Condivisione dal PC — stile minimal monocromatico allineato a index.html */
+:root{color-scheme:dark;--bg:#09090b;--surface:#111113;--surface-2:#18181b;--surface-3:#222226;--line:#1e1e22;--line-2:#2c2c31;--text:#fafafa;--text-2:#d4d4d8;--muted:#a1a1aa;--dim:#71717a;--white:#fafafa;--white-ink:#09090b;--danger:#f87171;--r:14px;--r-sm:8px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;background:var(--bg);color:var(--text)}
 *{box-sizing:border-box}
-body{margin:0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));-webkit-font-smoothing:antialiased}
-main{max-width:960px;margin:auto}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));-webkit-font-smoothing:antialiased}
+main{max-width:1020px;margin:0 auto}
 a{color:var(--text)}
 a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--white);outline-offset:2px}
 [hidden]{display:none!important}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:20px}
-#back{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);text-decoration:none;font-size:12.5px;color:var(--text-2);background:var(--surface)}
-#back:hover{background:var(--surface-2);color:var(--white)}
-#remote-view iframe{width:100%;height:calc(100dvh - 180px);min-height:420px;border:0;display:block;background:var(--bg)}
-#remote-view .note{margin:8px 0}
+.icon{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* ---- Top Bar ---- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.top-left{display:flex;align-items:center;gap:8px;min-width:0}
+#back{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);text-decoration:none;font-size:12.5px;font-weight:550;color:var(--text-2);background:var(--surface);transition:background .12s,border-color .12s,color .12s}
+#back:hover{background:var(--surface-2);border-color:#3a3a40;color:var(--white)}
+.brand{font-weight:650;letter-spacing:-.5px;font-size:18px;color:var(--white)}.brand span{color:var(--dim)}
+
+/* ---- Heading ---- */
+.page-head{margin-bottom:20px}
+h1{font-size:23px;letter-spacing:-.6px;margin:0 0 4px;font-weight:650;color:var(--white)}
+.lead{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5;max-width:62ch}
+
+/* ---- Remote Mode ---- */
+#remote-view .status-box{margin-bottom:8px}
+#remote-view .note{margin:0 0 12px}
+#remote-view iframe{width:100%;height:calc(100dvh - 190px);min-height:440px;border:1px solid var(--line-2);border-radius:var(--r);display:block;background:var(--bg)}
 .remote-mode #preview-panel{position:fixed;bottom:0;left:0;width:2px;height:2px;overflow:hidden;margin:0;padding:0;border:0;pointer-events:none}
 .remote-mode #preview-panel video{width:2px;height:2px;margin:0;border:0}
-.brand{font-weight:650;letter-spacing:-.5px;font-size:17px;color:var(--white)}.brand span{color:var(--dim)}
-h1{font-size:24px;letter-spacing:-.6px;margin:0 0 6px;font-weight:650}
-.lead{margin:0 0 20px;color:var(--muted);line-height:1.55;max-width:66ch}
-p{line-height:1.55;color:var(--muted);margin:0}
-.grid{display:grid;gap:24px}
-.sect{padding:16px 0;border-top:1px solid var(--line)}
-h2{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 12px}
-button,select{font:inherit;color:inherit}
-button{min-height:40px;padding:0 16px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;touch-action:manipulation;font-weight:550;font-size:13px}
-button:hover:not(:disabled){background:var(--surface-2);border-color:#3f3f46}
-button:disabled{opacity:.4;cursor:default}
-#start{background:var(--white);color:var(--white-ink);border-color:var(--white);font-weight:600}
-#start:hover:not(:disabled){background:#e4e4e7}
-#stop{color:var(--danger)}
-.actions{display:grid;grid-template-columns:1.3fr 1fr;gap:8px;margin:14px 0 10px}
-.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.status{padding:10px 12px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);color:var(--text-2);font-size:13px;line-height:1.45}
-#tv-status{flex:1 1 200px;font-size:12.5px}
-details{border-top:1px solid var(--line);margin-top:14px;padding-top:4px}
-summary{cursor:pointer;min-height:40px;display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:550;color:var(--muted);list-style:none}
-summary::-webkit-details-marker{display:none}
-summary::after{content:'+';font-size:16px;color:var(--dim)}
-details[open] summary::after{content:'−'}
-#receiver{overflow-wrap:anywhere;font-family:ui-monospace,Consolas,monospace;font-size:12px}
-#launch{margin-top:12px;padding:12px;border:1px solid var(--line-2);background:var(--surface);border-radius:var(--r-sm)}
-.field{display:grid;gap:5px;margin:0 0 12px;font-size:12.5px;color:var(--muted)}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.fields .wide{grid-column:1/-1}
-select{width:100%;min-height:40px;padding:0 10px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);font-size:13.5px;color:var(--text)}
-select:disabled{opacity:.45}
-.check{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;margin:0 0 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;font-size:13px;color:var(--text-2)}
-.check input{width:16px;height:16px;accent-color:var(--white);margin:0}
-.note{font-size:11.5px;color:var(--dim);line-height:1.5}
-#audio-status{margin-top:10px;font-size:12.5px}
-video{width:100%;max-height:400px;background:#000;border-radius:var(--r-sm);border:1px solid var(--line);margin:8px 0 4px;display:block}
-@media(min-width:820px){
- body{padding:28px 32px}
- .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:start}
- .preview-sect{grid-column:1/-1}
-}
-@media(max-width:420px){.fields{grid-template-columns:1fr}}
-</style></head><body><main>
-<header class="top"><a href="#telecomando" id="back">← Telecomando</a><button id="remote-stop" hidden disabled>Interrompi</button><span class="brand" aria-hidden="true">Salotto<span>.</span></span></header>
-<section id="remote-view" hidden aria-label="Telecomando durante la condivisione"><p id="remote-status" class="status" role="status" aria-live="polite"></p><p class="note">Puoi usare il telecomando qui senza interrompere la condivisione. Uscendo da Safari, iOS può sospendere la trasmissione.</p><iframe id="remote-frame" title="Telecomando TV"></iframe></section>
-<div id="share-view"><h1>Condividi lo schermo</h1>
-<p class="lead">Con la TV accesa, premi «Condividi» e scegli lo schermo, una finestra o una scheda. Il ricevitore sulla TV si apre automaticamente.</p>
-<div class="grid"><section class="sect" aria-label="Avvio della condivisione"><h2>Avvio</h2><div><button id="open-tv" disabled>Apri sulla TV</button></div>
-<p id="tv-status" role="status" aria-live="polite">Il browser della TV verrà aperto sulla pagina ricevente.</p>
-<details><summary>Indirizzo del ricevitore</summary><p><a id="receiver" target="_blank" rel="noopener"></a></p></details>
-<div id="launch" hidden><p id="secure-note">Per condividere lo schermo apri la versione HTTPS del telecomando.</p><p><a id="secure-link">Apri condivisione sicura</a></p></div>
-<div class="actions"><button id="start" disabled>Condividi</button><button id="stop" disabled>Interrompi</button></div>
-<p id="status" class="status" role="status" aria-live="polite">Verifica del browser…</p>
-</section><div><section class="sect" aria-label="Impostazioni video"><h2>Video</h2><div class="fields"><label class="field wide">Contenuto <select id="video-profile"><option value="cinema" selected>Film e video — qualità elevata</option><option value="balanced">Desktop — meno banda</option></select></label>
-<label class="field">Larghezza massima <select id="width"><option value="640">640 px</option><option value="960">960 px</option><option value="1280">1280 px — HD</option><option value="1920" selected>1920 px — Full HD</option></select></label>
-<label class="field">Immagini al secondo <select id="fps"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="24">24</option><option value="25">25</option><option value="30">30</option><option value="60" selected>60</option></select></label>
-<label class="field wide">Modalità <select id="transport"><option value="native" selected>Video nativo TV · fluidità</option><option value="native-app">Ricevitore Tizen · richiede installazione</option><option value="auto">Automatica</option><option value="jpeg">Compatibile · immagini adattive</option></select></label>
-</div><p class="note">Per i film prova 24, 25 o 30 immagini/s secondo il contenuto. Full HD conserva più dettagli ma richiede più banda e può ridurre la fluidità: se noti scatti, torna a 1280 px. Video nativo TV usa il lettore della TV con audio sincronizzato; il lettore integrato può aggiungere 10–12 secondi di ritardo. La frequenza scelta è un limite richiesto; il percorso compatibile usa fino a 30 immagini/s, H.264 fino a 60. La cattura si adegua al limite effettivo.</p>
-</section><section class="sect" aria-label="Impostazioni audio"><h2>Audio</h2><label class="check"><input id="audio-enabled" type="checkbox" checked> Condividi anche l’audio</label>
-<p class="note">L’audio è destinato alla TV: al browser viene richiesto di silenziare la riproduzione locale durante la condivisione e ripristinarla quando termini.</p>
-<label class="field">Qualità audio <select id="audio-quality"><option value="music">Musica e video · stereo</option><option value="voice">Voce · mono, meno banda</option></select></label>
-<p class="note">Con «Schermo intero», attiva anche «Condividi audio del sistema» nel dialogo del browser. Con una scheda, attiva «Condividi audio della scheda». Il microfono non viene acquisito.</p>
-<button id="select-audio" disabled>Scegli audio da una scheda…</button>
-<p class="note">Se l’audio di sistema non arriva, questo pulsante consente di scegliere una scheda solo per il suono: le immagini restano quelle dello schermo già condiviso.</p>
-<p id="audio-status" role="status" aria-live="polite">Audio pronto, se incluso nella selezione del browser.</p>
 
-</section></div></div></div><section id="preview-panel" class="sect preview-sect" aria-label="Anteprima"><details><summary>Anteprima sul dispositivo</summary><video id="preview" muted autoplay playsinline></video></details><canvas id="capture" hidden></canvas>
-</section></main><script type="application/json" id="share-config">__CONFIG__</script>
-<script src="/assets/audio-share.js"></script><script src="/assets/native-share.js"></script><script src="/assets/share.js"></script></body></html>
+/* ---- Layout Grid & Cards ---- */
+.grid{display:grid;gap:16px;align-items:start}
+.stack{display:grid;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r);padding:18px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+h2{font-size:10.5px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin:0}
+
+/* ---- Buttons ---- */
+button,select{font:inherit;color:inherit}
+button{min-height:40px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface-2);cursor:pointer;touch-action:manipulation;font-weight:550;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:7px;-webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s,color .12s,transform .06s}
+button:hover:not(:disabled){background:var(--surface-3);border-color:#3f3f46;color:var(--white)}
+button:active:not(:disabled){transform:scale(.98)}
+button:disabled{opacity:.38;cursor:default}
+#start{min-height:46px;background:var(--white);color:var(--white-ink);border-color:var(--white);font-weight:650;font-size:13.5px}
+#start:hover:not(:disabled){background:#e4e4e7;border-color:#e4e4e7;color:var(--white-ink)}
+#stop,#remote-stop{min-height:46px;background:transparent;color:var(--danger);border-color:var(--line-2)}
+#stop:disabled,#remote-stop:disabled{color:var(--muted)}
+#remote-stop{min-height:36px;padding:0 12px;font-size:12.5px}
+#stop:hover:not(:disabled),#remote-stop:hover:not(:disabled){background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.35)}
+
+/* ---- Preset Switcher ---- */
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.preset{min-height:66px;padding:10px 12px;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;text-align:left;background:var(--bg);border:1px solid var(--line-2);border-radius:10px}
+.preset:hover:not(:disabled){background:var(--surface-2);border-color:#3f3f46}
+.preset-top{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text)}
+.preset-sub{font-size:11px;font-weight:450;color:var(--dim);line-height:1.35}
+.preset.active{background:var(--white);border-color:var(--white)}
+.preset.active:hover:not(:disabled){background:#e4e4e7;border-color:#e4e4e7}
+.preset.active .preset-top{color:var(--white-ink)}
+.preset.active .preset-sub{color:#52525b}
+
+/* ---- Primary Actions & Live Status ---- */
+.actions{display:grid;grid-template-columns:1.35fr 1fr;gap:8px;margin-bottom:12px}
+.status-box{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;background:var(--bg);border:1px solid var(--line-2);border-radius:var(--r-sm)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);margin-top:5px;flex-shrink:0;transition:background .2s,box-shadow .2s}
+.is-sharing .status-dot{background:var(--white);box-shadow:0 0 0 3px rgba(250,250,250,.14)}
+.status-text{margin:0;color:var(--text-2);font-size:12.5px;line-height:1.45;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+
+/* ---- HTTPS Launch Banner ---- */
+#launch{margin-top:12px;padding:12px;border:1px solid var(--line-2);background:var(--surface-2);border-radius:var(--r-sm);display:grid;gap:8px}
+#launch p{margin:0;font-size:12.5px;color:var(--text-2);line-height:1.45}
+#secure-link{display:inline-flex;align-items:center;justify-content:center;width:fit-content;min-height:36px;padding:0 14px;border-radius:var(--r-sm);background:var(--white);color:var(--white-ink);text-decoration:none;font-size:12.5px;font-weight:600}
+#secure-link:hover{background:#e4e4e7}
+
+/* ---- TV Secondary Bar ---- */
+.tv-bar{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:8px}
+.tv-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#open-tv{min-height:36px;padding:0 12px;font-size:12.5px;background:transparent}
+#tv-status{flex:1 1 180px;margin:0;font-size:12px;color:var(--muted);line-height:1.4}
+#receiver{overflow-wrap:anywhere;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--text-2)}
+
+/* ---- Fields & Custom Minimal Select ---- */
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{display:grid;gap:5px;margin:0;font-size:12px;font-weight:500;color:var(--muted)}
+.field.wide{grid-column:1/-1}
+.select-wrap{position:relative;display:flex;align-items:center}
+select{width:100%;min-height:40px;padding:0 32px 0 11px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--bg);font-size:13px;font-weight:500;color:var(--text);appearance:none;-webkit-appearance:none;cursor:pointer;transition:border-color .12s,background .12s}
+select:hover:not(:disabled){border-color:#3f3f46;background:var(--surface-2)}
+select:disabled{opacity:.45;cursor:default}
+.chev{position:absolute;right:10px;width:15px;height:15px;color:var(--dim);pointer-events:none}
+.hint{margin:4px 0 0;font-size:11.5px;color:var(--dim);line-height:1.45}
+
+/* ---- Audio Toggle & Row ---- */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin-bottom:12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--bg);cursor:pointer;transition:border-color .12s,background .12s}
+.toggle-row:hover{border-color:#3f3f46}
+.toggle-copy{display:grid;gap:2px}
+.toggle-title{font-size:13px;font-weight:550;color:var(--text)}
+.toggle-sub{font-size:11px;color:var(--dim)}
+#audio-enabled{appearance:none;-webkit-appearance:none;position:relative;width:40px;height:22px;border-radius:99px;background:var(--surface-3);border:1px solid var(--line-2);cursor:pointer;flex-shrink:0;margin:0;transition:background .15s,border-color .15s}
+#audio-enabled::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+#audio-enabled:checked{background:var(--white);border-color:var(--white)}
+#audio-enabled:checked::after{transform:translateX(18px);background:var(--white-ink)}
+#audio-enabled:disabled{opacity:.4;cursor:default}
+.audio-row{display:grid;grid-template-columns:1.15fr .85fr;gap:8px;align-items:end;margin-bottom:10px}
+#select-audio{min-height:40px;font-size:12.5px;padding:0 10px;background:transparent;white-space:nowrap}
+#audio-status{margin:0;font-size:12px;color:var(--muted);line-height:1.45}
+
+/* ---- Drawers & Preview ---- */
+details.mini-drawer{margin-top:10px;border-top:1px solid var(--line)}
+details.mini-drawer summary{cursor:pointer;min-height:36px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:500;color:var(--dim);list-style:none}
+details.mini-drawer summary:hover{color:var(--text-2)}
+details.mini-drawer summary::-webkit-details-marker{display:none}
+details.mini-drawer summary::after{content:'+';font-size:15px;color:var(--dim);font-weight:400}
+details.mini-drawer[open] summary::after{content:'−'}
+details.mini-drawer .note,details.mini-drawer p{margin:2px 0 8px}
+.note{font-size:11.5px;color:var(--dim);line-height:1.5}
+.preview-sect{margin-top:16px}
+.preview-sect details{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r);padding:0 18px}
+.preview-sect summary{cursor:pointer;min-height:46px;display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:550;color:var(--muted);list-style:none}
+.preview-sect summary:hover{color:var(--text)}
+.preview-sect summary::-webkit-details-marker{display:none}
+.preview-sect summary::after{content:'+';font-size:16px;color:var(--dim);font-weight:400}
+.preview-sect details[open] summary::after{content:'−'}
+video{width:100%;max-height:420px;background:#000;border-radius:var(--r-sm);border:1px solid var(--line);margin:0 0 16px;display:block}
+
+@media(min-width:860px){
+ body{padding:24px 32px 36px}
+ .grid{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px}
+ .card{padding:20px}
+}
+@media(max-width:520px){
+ .presets,.fields,.audio-row{grid-template-columns:1fr}
+ .actions{grid-template-columns:1fr 1fr}
+ .card{padding:15px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body><main>
+<header class="top">
+ <div class="top-left">
+  <a href="#telecomando" id="back">← Telecomando</a>
+  <button id="remote-stop" hidden disabled>Interrompi</button>
+ </div>
+ <span class="brand" aria-hidden="true">Salotto<span>.</span></span>
+</header>
+
+<section id="remote-view" hidden aria-label="Telecomando durante la condivisione">
+ <div class="status-box"><span class="status-dot" aria-hidden="true"></span><p id="remote-status" class="status-text" role="status" aria-live="polite"></p></div>
+ <p class="note">Puoi usare il telecomando qui senza interrompere la condivisione. Uscendo da Safari, iOS può sospendere la trasmissione.</p>
+ <iframe id="remote-frame" title="Telecomando TV"></iframe>
+</section>
+
+<div id="share-view">
+ <div class="page-head">
+  <h1>Condividi schermo</h1>
+  <p class="lead">Trasmetti schermo, finestra o scheda sulla TV della rete locale.</p>
+ </div>
+
+ <div class="grid">
+  <section class="card hero-card" aria-label="Avvio della condivisione">
+   <div class="card-head"><h2>Profilo rapido</h2></div>
+   <div class="presets" role="group" aria-label="Profili rapidi">
+    <button type="button" class="preset active" id="preset-cinema" aria-pressed="true">
+     <span class="preset-top"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>Film e video</span>
+     <span class="preset-sub">Full HD 60 · audio sync · ~10 s ritardo</span>
+    </button>
+    <button type="button" class="preset" id="preset-desktop" aria-pressed="false">
+     <span class="preset-top"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Desktop interattivo</span>
+     <span class="preset-sub">HD 30 · bassa latenza · mouse reattivo</span>
+    </button>
+   </div>
+
+   <div class="actions">
+    <button id="start" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><line x1="2" y1="20" x2="2.01" y2="20"/></svg>Condividi</button>
+    <button id="stop" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Interrompi</button>
+   </div>
+
+   <div class="status-box" aria-live="polite">
+    <span class="status-dot" aria-hidden="true"></span>
+    <p id="status" class="status-text" role="status">Verifica del browser…</p>
+   </div>
+
+   <div id="launch" hidden>
+    <p id="secure-note">Per condividere lo schermo apri la versione HTTPS del telecomando.</p>
+    <a id="secure-link">Apri condivisione sicura</a>
+   </div>
+
+   <div class="tv-bar">
+    <div class="tv-row">
+     <button id="open-tv" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Apri sulla TV</button>
+     <p id="tv-status" role="status" aria-live="polite">Il browser della TV si apre automaticamente quando serve.</p>
+    </div>
+    <details class="mini-drawer">
+     <summary>Indirizzo del ricevitore</summary>
+     <p><a id="receiver" target="_blank" rel="noopener"></a></p>
+    </details>
+   </div>
+  </section>
+
+  <div class="stack">
+   <section class="card" aria-label="Impostazioni video">
+    <div class="card-head"><h2>Video</h2></div>
+    <div class="fields">
+     <label class="field wide">Modalità
+      <span class="select-wrap">
+       <select id="transport">
+        <option value="native" selected>Video nativo TV · massima fluidità</option>
+        <option value="native-app">Ricevitore Tizen · richiede installazione</option>
+        <option value="auto">Automatica · bassa latenza</option>
+        <option value="jpeg">Compatibile · immagini adattive</option>
+       </select>
+       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+      <span id="mode-hint" class="hint">Usa il lettore video della TV con audio sincronizzato (~10–12 s di buffer).</span>
+     </label>
+     <label class="field wide">Contenuto
+      <span class="select-wrap">
+       <select id="video-profile">
+        <option value="cinema" selected>Film e video · qualità elevata</option>
+        <option value="balanced">Desktop · testo nitido, meno banda</option>
+       </select>
+       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+     </label>
+     <label class="field">Risoluzione max
+      <span class="select-wrap">
+       <select id="width">
+        <option value="640">640 px</option>
+        <option value="960">960 px</option>
+        <option value="1280">1280 px · HD</option>
+        <option value="1920" selected>1920 px · Full HD</option>
+       </select>
+       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+     </label>
+     <label class="field">Immagini/s
+      <span class="select-wrap">
+       <select id="fps">
+        <option value="5">5 fps</option>
+        <option value="10">10 fps</option>
+        <option value="15">15 fps</option>
+        <option value="24">24 fps</option>
+        <option value="25">25 fps</option>
+        <option value="30">30 fps</option>
+        <option value="60" selected>60 fps</option>
+       </select>
+       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+     </label>
+    </div>
+    <details class="mini-drawer">
+     <summary>Dettagli su modalità e fluidità</summary>
+     <p class="note">Per i film puoi usare 24, 25 o 30 immagini/s secondo il contenuto. Full HD conserva più dettagli ma richiede più banda; su connessione debole passa a 1280 px. La frequenza scelta è un limite massimo: la modalità compatibile arriva fino a 30 immagini/s, H.264 fino a 60.</p>
+    </details>
+   </section>
+
+   <section class="card" aria-label="Impostazioni audio">
+    <div class="card-head"><h2>Audio</h2></div>
+    <label class="toggle-row">
+     <span class="toggle-copy">
+      <span class="toggle-title">Condividi anche l’audio</span>
+      <span class="toggle-sub">Riproduzione locale silenziata dal browser</span>
+     </span>
+     <input id="audio-enabled" type="checkbox" checked>
+    </label>
+    <div class="audio-row">
+     <label class="field">Qualità audio
+      <span class="select-wrap">
+       <select id="audio-quality">
+        <option value="music">Musica e video · stereo</option>
+        <option value="voice">Voce · mono, meno banda</option>
+       </select>
+       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+     </label>
+     <button id="select-audio" disabled>Audio da scheda…</button>
+    </div>
+    <p id="audio-status" role="status" aria-live="polite">Audio pronto, se incluso nella selezione del browser.</p>
+    <details class="mini-drawer">
+     <summary>Guida audio di sistema</summary>
+     <p class="note">Con «Schermo intero» attiva «Condividi audio del sistema» nel dialogo del browser; con una scheda attiva «Condividi audio della scheda». Il microfono non viene acquisito. Se l’audio di sistema non arriva, usa «Audio da scheda…» mantenendo il video attuale.</p>
+    </details>
+   </section>
+  </div>
+ </div>
+</div>
+
+<section id="preview-panel" class="preview-sect" aria-label="Anteprima">
+ <details><summary>Anteprima sul dispositivo</summary><video id="preview" muted autoplay playsinline></video></details>
+ <canvas id="capture" hidden></canvas>
+</section>
+</main>
+<script type="application/json" id="share-config">__CONFIG__</script>
+<script src="/assets/audio-share.js"></script><script src="/assets/native-share.js"></script><script src="/assets/share.js"></script>
+</body></html>

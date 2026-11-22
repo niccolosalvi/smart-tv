@@ -59,6 +59,39 @@ $('open-tv').disabled=!config.available;
 if((!config.native_available||target.origin!==location.origin)&&$('transport').value==='native')$('transport').value='auto';
 for(const option of ($('transport').options||[]))if(option.value==='native')option.disabled=!config.native_available||target.origin!==location.origin;
 for(const option of ($('transport').options||[]))if(option.value==='native-app')option.disabled=!config.native_available||!config.tizen_receiver_available||target.origin!==location.origin;
+const MODE_HINTS={
+ native:'Usa il lettore della TV con audio sincronizzato (~10–12 s di buffer per film/video).',
+ 'native-app':'Usa l’app Tizen dedicata (richiede installazione e flag SMART_TV_TIZEN_RECEIVER=1).',
+ auto:'Sceglie H.264 se supportato o immagini adattive su Samsung 2016; latenza bassa.',
+ jpeg:'Invia solo le aree modificate in JPEG/PNG (fino a 30 fps); ideale per desktop e testo.'
+};
+const useNativeDefault=!!(config.native_available&&target.origin===location.origin);
+function syncModeUI(){
+ const mode=$('transport').value;
+ $('mode-hint').textContent=MODE_HINTS[mode]||'';
+ const cinemaMatch=mode===(useNativeDefault?'native':'auto')&&$('video-profile').value==='cinema'&&$('width').value==='1920'&&$('fps').value==='60';
+ const desktopMatch=mode==='auto'&&$('video-profile').value==='balanced'&&$('width').value==='1280'&&$('fps').value==='30';
+ for(const [id,active] of [['preset-cinema',cinemaMatch],['preset-desktop',desktopMatch]]){
+  const btn=$(id);if(!btn)continue;
+  if(btn.classList)btn.classList.toggle('active',active);
+  if(btn.setAttribute)btn.setAttribute('aria-pressed',active?'true':'false');
+ }
+}
+function applyPreset(kind){
+ if(running)return;
+ if(kind==='cinema'){
+  $('transport').value=useNativeDefault?'native':'auto';
+  $('video-profile').value='cinema';$('width').value='1920';$('fps').value='60';
+ }else{
+  $('transport').value='auto';
+  $('video-profile').value='balanced';$('width').value='1280';$('fps').value='30';
+ }
+ syncModeUI();
+}
+$('preset-cinema').onclick=()=>applyPreset('cinema');
+$('preset-desktop').onclick=()=>applyPreset('desktop');
+for(const id of ['transport','video-profile','width','fps'])$(id).addEventListener('change',syncModeUI);
+syncModeUI();
 async function tvCommand(action,keepalive=false){
  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':config.key},body:JSON.stringify({screen:action}),keepalive,signal:keepalive?undefined:AbortSignal.timeout(25000)});
  const result=await response.json();if(!response.ok)throw Error(result.error||'Richiesta rifiutata');return result;
@@ -97,7 +130,9 @@ function stop(text,keepalive=false){
  $('preview').srcObject=null;$('preview').hidden=true;$('stop').disabled=true;
  $('open-tv').disabled=!config.available;
  $('width').disabled=$('fps').disabled=$('transport').disabled=$('video-profile').disabled=false;
+ $('preset-cinema').disabled=$('preset-desktop').disabled=false;
  $('audio-enabled').disabled=$('audio-quality').disabled=false;
+ if(document.body&&document.body.classList)document.body.classList.toggle('is-sharing',false);
  message(text||'Condivisione terminata.');
  if(close&&!closePromise){
   $('start').disabled=true;$('tv-status').textContent='Chiusura del ricevitore e del browser sulla TV…';
@@ -211,7 +246,9 @@ $('start').onclick=async()=>{
   stream=captured;needClose=!nativeMode;forceJPEG=$('transport').value==='jpeg';
   const track=stream.getVideoTracks()[0];try{track.contentHint=$('video-profile').value==='cinema'?'motion':'detail';}catch(ignored){}
   track.onended=()=>stop();$('stop').disabled=false;$('width').disabled=$('fps').disabled=$('transport').disabled=$('video-profile').disabled=true;
+  $('preset-cinema').disabled=$('preset-desktop').disabled=true;
   $('audio-enabled').disabled=$('audio-quality').disabled=true;
+  if(document.body&&document.body.classList)document.body.classList.toggle('is-sharing',true);
   $('select-audio').disabled=false;
   if(audioSender)audioSender.start(stream.getAudioTracks()[0],track.getSettings().displaySurface);
   if(typeof MediaStreamTrackProcessor!=='function'){
