@@ -166,6 +166,7 @@ class Handler(BaseHTTPRequestHandler):
         try:session=native_cast.get(parts[2])
         except ValueError:return self.reply(404, {'error':'Sessione video non valida'})
         if session.closed:return self.reply(410, {'error':'Trasmissione terminata'})
+        self.protocol_version = 'HTTP/1.0'
         self.send_response(200)
         self.send_header('Content-Type','video/mpeg')
         self.send_header('Cache-Control','no-store')
@@ -188,9 +189,13 @@ class Handler(BaseHTTPRequestHandler):
                 session=native_cast.get(parts[2])
                 if session.closed:self.send_error(410);return
             except ValueError:self.send_error(404);return
+            self.protocol_version = 'HTTP/1.0'
             self.send_response(200);self.send_header('Content-Type','video/mpeg')
-            self.send_header('Content-Length','0')
-            self.send_header('Connection','close');self.close_connection=True;self.end_headers();return
+            self.send_header('Cache-Control','no-store')
+            self.send_header('Connection','close')
+            self.send_header('transferMode.dlna.org','Streaming')
+            self.send_header('contentFeatures.dlna.org','DLNA.ORG_OP=00;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000')
+            self.close_connection=True;self.end_headers();return
         self.send_error(404)
 
     def native_post(self):

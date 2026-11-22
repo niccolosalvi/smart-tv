@@ -127,13 +127,16 @@ class ScreenShareOptimizationTests(unittest.TestCase):
             sess = NativeSession(Mock(), 'http://192.0.2.1:8765')
         return sess, popen.call_args.args[0]
 
-    def test_ffmpeg_args_include_low_latency_flags(self):
+    def test_ffmpeg_args_preserve_initial_gop_and_low_delay_muxing(self):
         sess, args = self._fake_session()
-        self.assertIn('-fflags', args)
-        self.assertIn('+nobuffer', args)
-        self.assertIn('-max_delay', args)
+        self.assertNotIn('+nobuffer', args)
+        self.assertNotIn('-fflags', args)
+        self.assertEqual(args[args.index('-probesize') + 1], '65536')
+        self.assertEqual(args[args.index('-analyzeduration') + 1], '1000000')
         self.assertEqual(args[args.index('-c') + 1], 'copy')
         self.assertNotIn('libx264', args)
+        self.assertIn('+resend_headers', args)
+        self.assertIn('-flush_packets', args)
         sess.close()
 
     def test_measure_video_handles_splits_adaptation_and_33bit_pts_wrap(self):
@@ -201,7 +204,8 @@ class ScreenShareOptimizationTests(unittest.TestCase):
                     self.connects += 1
                     super().connect()
 
-            fake_sess = Mock(closed=False)
+            fake_sess = Mock(closed=False, launcher=None)
+            fake_sess.stream = lambda: iter([b'ts-part-1', b'ts-part-2'])
             try:
                 with patch.object(server.native_cast, 'get', return_value=fake_sess), \
                         patch.object(server.native_cast, 'host', '127.0.0.1'):
@@ -217,6 +221,7 @@ class ScreenShareOptimizationTests(unittest.TestCase):
                         resp = conn.getresponse()
                         body = json.loads(resp.read())
                         self.assertEqual(resp.status, 200)
+                        self.assertEqual(resp.version, 11)
                         self.assertTrue(body['accepted'])
                     self.assertEqual(conn.connects, 1)
                     conn.close()
@@ -226,9 +231,23 @@ class ScreenShareOptimizationTests(unittest.TestCase):
                     head_resp = conn2.getresponse()
                     head_resp.read()
                     self.assertEqual(head_resp.status, 200)
-                    self.assertEqual(head_resp.getheader('Content-Length'), '0')
+                    self.assertEqual(head_resp.version, 10)
+                    self.assertIsNone(head_resp.getheader('Content-Length'))
                     self.assertEqual(head_resp.getheader('Connection'), 'close')
+                    self.assertEqual(head_resp.getheader('transferMode.dlna.org'), 'Streaming')
+                    self.assertTrue((head_resp.getheader('contentFeatures.dlna.org') or '').startswith('DLNA.ORG_OP=00'))
                     conn2.close()
+
+                    conn3 = http.client.HTTPConnection('127.0.0.1', srv.server_port, timeout=5)
+                    conn3.request('GET', '/native/sess/stream.ts', headers={'Host': f'127.0.0.1:{srv.server_port}'})
+                    get_resp = conn3.getresponse()
+                    streamed = get_resp.read()
+                    self.assertEqual(get_resp.status, 200)
+                    self.assertEqual(get_resp.version, 10)
+                    self.assertIsNone(get_resp.getheader('Content-Length'))
+                    self.assertEqual(get_resp.getheader('Connection'), 'close')
+                    self.assertEqual(streamed, b'ts-part-1ts-part-2')
+                    conn3.close()
             finally:
                 srv.shutdown()
                 srv.server_close()

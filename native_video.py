@@ -92,7 +92,7 @@ class NativeSession:
         self.last_input = time.monotonic()
         self.inputs = queue.Queue(maxsize=8)
         self.process = subprocess.Popen([executable,'-hide_banner','-loglevel','error',
-            '-fflags','+nobuffer','-probesize','65536','-analyzeduration','400000','-max_delay','0','-i','pipe:0',
+            '-probesize','65536','-analyzeduration','1000000','-i','pipe:0',
             '-map','0:v:0','-map','0:a:0?','-c','copy','-bsf:v','h264_mp4toannexb',
             '-mpegts_flags','+resend_headers','-pcr_period','20',
             '-pat_period','0.1','-muxdelay','0','-muxpreload','0',
@@ -175,7 +175,7 @@ class NativeSession:
                 self.condition.wait_for(lambda:self.closed or self.end>0,timeout=12)
                 if self.closed:return
                 if not self.end:raise RuntimeError('Nessun video dal codificatore')
-                self.condition.wait_for(lambda:self.closed or self.end>=131072,timeout=0.35)
+                self.condition.wait_for(lambda:self.closed or (self.video_frames>0 and self.end>=131072),timeout=0.75)
             if self.closed:return
             if self.launcher:
                 self.launcher(self.url)
@@ -189,6 +189,8 @@ class NativeSession:
                 if self.transport in ('STOPPED','NO_MEDIA_PRESENT') and time.monotonic()-started>12:
                     raise RuntimeError('Il lettore ha interrotto il video')
                 time.sleep(1)
+        except RuntimeError as exc:
+            if not self.closed:self.close(str(exc))
         except Exception:
             if not self.closed:self.close('Il lettore nativo della TV non risponde')
         finally:

@@ -21,7 +21,7 @@ class ScreenNativeSender{
   const track=stream.getVideoTracks()[0],settings=track.getSettings();
   const w=settings.width||options.width,h=settings.height||Math.round(options.width*9/16),fps=Math.round(settings.frameRate||options.fps);
   this.label=w+'×'+h+' · cattura '+fps+' immagini/s';
-  const videoBps=Math.round(Math.max(2500000,Math.min(12000000,w*h*fps*.10)));
+  const videoBps=Math.round(Math.max(2500000,Math.min(12000000,(w*h*fps*.10)||6000000)));
   this.recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:videoBps,audioBitsPerSecond:128000,videoKeyFrameIntervalDuration:1000});
   this.recorder.ondataavailable=event=>{
    if(this.stopped||!event.data.size)return;
