@@ -10,7 +10,10 @@ const seekReadout = document.querySelector('#youtube-seek-readout');
 const seekSubmit = document.querySelector('#youtube-seek-submit');
 const seekForm = document.querySelector('#youtube-seek-form');
 const previewWrap = document.querySelector('#youtube-preview-wrap');
-const previewFrame = document.querySelector('#youtube-preview-frame');
+const previewCanvas = document.querySelector('#youtube-preview-canvas');
+const previewCtx = previewCanvas ? previewCanvas.getContext('2d') : null;
+const previewTitle = document.querySelector('#youtube-preview-title');
+const previewBadge = document.querySelector('#youtube-preview-badge');
 const previewEmpty = document.querySelector('#youtube-preview-empty');
 const previewToggle = document.querySelector('#youtube-preview-toggle');
 
@@ -71,18 +74,49 @@ function parseSeekTime(text) {
 
 let currentPreviewVideoId = null;
 let previewDuration = 0;
-let initialPaused = false;
-let seekPreviewTimer = null;
-let pausePreviewTimer = null;
-let lastPreviewSeekAt = 0;
+let storyboardSpec = null;
+const sheetCache = new Map();
+let pendingDraw = null;
 let userScrubUntil = 0;
 let lastAutoSyncedSec = -1;
 
-function ytCommand(func, args = []) {
- if (!previewFrame || !previewFrame.contentWindow || !currentPreviewVideoId) return;
- try {
-  previewFrame.contentWindow.postMessage(JSON.stringify({event: 'command', func, args}), '*');
- } catch {}
+function drawFullImage(img) {
+ if (!previewCanvas || !previewCtx || !img.naturalWidth || !img.naturalHeight) return;
+ previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+ const scale = Math.max(previewCanvas.width / img.naturalWidth, previewCanvas.height / img.naturalHeight);
+ const dw = img.naturalWidth * scale;
+ const dh = img.naturalHeight * scale;
+ previewCtx.drawImage(img, (previewCanvas.width - dw) / 2, (previewCanvas.height - dh) / 2, dw, dh);
+}
+
+function drawStoryboardTile(img, sb, col, row) {
+ if (!previewCanvas || !previewCtx || !img.naturalWidth || !img.naturalHeight) return;
+ const sx = col * sb.width;
+ const sy = row * sb.height;
+ if (sx + sb.width > img.naturalWidth + 1 || sy + sb.height > img.naturalHeight + 1) return;
+ previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+ previewCtx.drawImage(img, sx, sy, sb.width, sb.height, 0, 0, previewCanvas.width, previewCanvas.height);
+}
+
+function getSheetImage(videoId, sb, sheetIdx) {
+ const key = `${videoId}:${sheetIdx}`;
+ let entry = sheetCache.get(key);
+ if (entry) return entry;
+ const img = new Image();
+ img.decoding = 'async';
+ entry = {img, loaded: false, failed: false};
+ sheetCache.set(key, entry);
+ img.onload = () => {
+  entry.loaded = true;
+  if (pendingDraw && pendingDraw.videoId === videoId && pendingDraw.sheetIdx === sheetIdx) {
+   drawStoryboardTile(img, sb, pendingDraw.col, pendingDraw.row);
+  }
+ };
+ img.onerror = () => {
+  entry.failed = true;
+ };
+ img.src = sb.sheet_url_template.replace('{M}', String(sheetIdx));
+ return entry;
 }
 
 function updateSeekUI(seconds, updateInput = true) {
@@ -94,39 +128,84 @@ function updateSeekUI(seconds, updateInput = true) {
  const formatted = formatSeekTime(clamped);
  const durFormatted = previewDuration > 0 ? formatSeekTime(previewDuration) : '--:--';
  if (seekReadout) seekReadout.textContent = `${formatted} / ${durFormatted}`;
+ if (previewBadge) previewBadge.textContent = formatted;
  if (seekSubmit) seekSubmit.textContent = `Vai a ${formatted} sulla TV`;
  if (updateInput && seekTimeInput) seekTimeInput.value = formatted;
 }
 
 function seekPreviewFrame(seconds) {
- if (!currentPreviewVideoId || !previewFrame || previewWrap?.hidden) return;
  const target = Math.max(0, Math.floor(Number(seconds) || 0));
- const now = performance.now();
- const fire = () => {
-  lastPreviewSeekAt = performance.now();
-  ytCommand('mute');
-  ytCommand('seekTo', [target, true]);
-  clearTimeout(pausePreviewTimer);
-  pausePreviewTimer = setTimeout(() => ytCommand('pauseVideo'), 240);
- };
- clearTimeout(seekPreviewTimer);
- if (now - lastPreviewSeekAt >= 180) fire();
- else seekPreviewTimer = setTimeout(fire, 180);
+ if (previewBadge) previewBadge.textContent = formatSeekTime(target);
+ if (!currentPreviewVideoId || !storyboardSpec || !previewCanvas || previewWrap?.hidden) return;
+ const sb = storyboardSpec;
+ const frameIdx = sb.interval_ms > 0
+  ? Math.min(sb.count - 1, Math.max(0, Math.floor((target * 1000) / sb.interval_ms)))
+  : (previewDuration > 0 ? Math.min(sb.count - 1, Math.max(0, Math.floor((target / previewDuration) * sb.count))) : 0);
+ const perSheet = Math.max(1, sb.cols * sb.rows);
+ const totalSheets = Math.max(1, Math.ceil(sb.count / perSheet));
+ const sheetIdx = Math.min(totalSheets - 1, Math.floor(frameIdx / perSheet));
+ const cellIdx = frameIdx % perSheet;
+ const col = cellIdx % sb.cols;
+ const row = Math.floor(cellIdx / sb.cols);
+
+ pendingDraw = {videoId: currentPreviewVideoId, sheetIdx, col, row};
+ const entry = getSheetImage(currentPreviewVideoId, sb, sheetIdx);
+ if (entry.loaded && !entry.failed) {
+  drawStoryboardTile(entry.img, sb, col, row);
+ }
+ // Preload adjacent sheets for instantaneous scrubbing.
+ if (sheetIdx + 1 < totalSheets) getSheetImage(currentPreviewVideoId, sb, sheetIdx + 1);
+ if (sheetIdx - 1 >= 0) getSheetImage(currentPreviewVideoId, sb, sheetIdx - 1);
+}
+
+async function loadStoryboard(videoId) {
+ try {
+  const resp = await fetch(`/api/youtube/storyboard?v=${encodeURIComponent(videoId)}`, {
+   headers: {'X-Remote-Key': controlKey},
+   signal: AbortSignal.timeout(7000),
+  });
+  if (!resp.ok) return;
+  const data = await resp.json();
+  if (videoId !== currentPreviewVideoId) return;
+  if (previewTitle) previewTitle.textContent = data.title || '';
+  if (typeof data.duration === 'number' && data.duration > 0) {
+   previewDuration = Math.round(data.duration);
+   if (seekSlider) seekSlider.max = String(previewDuration);
+   updateSeekUI(Number(seekSlider?.value) || 0, false);
+  }
+  if (data.storyboard && previewCanvas) {
+   storyboardSpec = data.storyboard;
+   previewCanvas.width = storyboardSpec.width;
+   previewCanvas.height = storyboardSpec.height;
+   seekPreviewFrame(Number(seekSlider?.value) || 0);
+  }
+ } catch {}
 }
 
 function syncYoutubePreview(videoId) {
  if (!videoId || !/^[A-Za-z0-9_-]{11}$/.test(videoId) || videoId === currentPreviewVideoId) return;
  currentPreviewVideoId = videoId;
  previewDuration = 0;
- initialPaused = false;
+ storyboardSpec = null;
+ pendingDraw = null;
  lastAutoSyncedSec = -1;
- if (previewFrame) {
-  const origin = encodeURIComponent(location.origin);
-  previewFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&mute=1&autoplay=1&controls=0&rel=0&playsinline=1&origin=${origin}`;
-  previewFrame.hidden = false;
+ sheetCache.clear();
+ if (previewTitle) previewTitle.textContent = '';
+ if (previewCanvas) {
+  previewCanvas.width = 320;
+  previewCanvas.height = 180;
+  previewCanvas.hidden = false;
  }
+ if (previewBadge) previewBadge.hidden = false;
  if (previewEmpty) previewEmpty.hidden = true;
+ const poster = new Image();
+ poster.decoding = 'async';
+ poster.onload = () => {
+  if (videoId === currentPreviewVideoId && !storyboardSpec) drawFullImage(poster);
+ };
+ poster.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
  updateSeekUI(Number(seekSlider?.value) || 0, true);
+ loadStoryboard(videoId);
 }
 window.syncYoutubePreview = syncYoutubePreview;
 
@@ -144,7 +223,7 @@ function syncYoutubeProgress(progress) {
  if (!isEditing && typeof progress.current_time === 'number' && progress.current_time >= 0) {
   const cur = Math.round(progress.current_time);
   updateSeekUI(cur, true);
-  if (Math.abs(cur - lastAutoSyncedSec) >= 8) {
+  if (Math.abs(cur - lastAutoSyncedSec) >= 8 || lastAutoSyncedSec < 0) {
    lastAutoSyncedSec = cur;
    seekPreviewFrame(cur);
   }
@@ -154,44 +233,13 @@ function syncYoutubeProgress(progress) {
 }
 window.syncYoutubeProgress = syncYoutubeProgress;
 
-if (previewFrame) {
- previewFrame.addEventListener('load', () => {
-  if (!currentPreviewVideoId || !previewFrame.contentWindow) return;
-  try {
-   previewFrame.contentWindow.postMessage(JSON.stringify({event: 'listening', id: 1, channel: 'widget'}), '*');
-   ytCommand('mute');
-  } catch {}
- });
-}
-
-window.addEventListener('message', event => {
- if (!event.origin.includes('youtube.com') && !event.origin.includes('youtube-nocookie.com')) return;
- try {
-  const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-  if (data?.event === 'infoDelivery' && data.info) {
-   if (typeof data.info.duration === 'number' && data.info.duration > 0) {
-    const dur = Math.round(data.info.duration);
-    if (dur !== previewDuration) {
-     previewDuration = dur;
-     if (seekSlider) seekSlider.max = String(dur);
-     updateSeekUI(Number(seekSlider?.value) || 0, false);
-    }
-   }
-   if (!initialPaused && data.info.playerState === 1) {
-    initialPaused = true;
-    ytCommand('mute');
-    ytCommand('pauseVideo');
-   }
-  }
- } catch {}
-});
-
 if (previewToggle && previewWrap) {
  previewToggle.addEventListener('click', () => {
   const hiding = !previewWrap.hidden;
   previewWrap.hidden = hiding;
   previewToggle.setAttribute('aria-expanded', String(!hiding));
   previewToggle.textContent = hiding ? 'Mostra anteprima' : 'Nascondi anteprima';
+  if (!hiding) seekPreviewFrame(Number(seekSlider?.value) || 0);
  });
 }
 
@@ -252,6 +300,7 @@ if (seekForm) {
   userScrubUntil = 0;
   lastAutoSyncedSec = parsed;
   updateSeekUI(parsed, true);
+  seekPreviewFrame(parsed);
   await command({youtube_seek: parsed});
  });
 }

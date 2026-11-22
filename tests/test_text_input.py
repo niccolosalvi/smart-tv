@@ -8,8 +8,10 @@ from diagnostics import Timeline
 from remote import Remote
 from text_input import (
     extract_youtube_video_id,
+    parse_youtube_storyboard,
     validate_query,
     validate_youtube_seek,
+    validate_youtube_video_id,
     youtube_search_payload,
     youtube_video_payload,
 )
@@ -67,6 +69,25 @@ class SearchInputTests(unittest.TestCase):
         for bad in [None, True, False, '120', -1, 86401, 12.5, [], {}]:
             with self.subTest(bad=repr(bad)), self.assertRaises(ValueError):
                 validate_youtube_seek(bad)
+
+    def test_parses_youtube_storyboard_spec_with_highest_resolution_level(self):
+        self.assertEqual(validate_youtube_video_id('QcZbyMzYYtU'), 'QcZbyMzYYtU')
+        with self.assertRaises(ValueError):
+            validate_youtube_video_id('bad')
+        html = (
+            '{"videoDetails":{"title":"Titolo \\"test\\""},"lengthSeconds":"1666",'
+            '"playerStoryboardSpecRenderer":{"spec":"https:\\/\\/i.ytimg.com\\/sb\\/QcZbyMzYYtU\\/storyboard3_L$L\\/$N.jpg?sqp=abc'
+            '|48#27#100#10#10#0#default#rs$SIG0'
+            '|320#180#168#3#3#10000#M$M#rs$SIG3"}}'
+        )
+        parsed = parse_youtube_storyboard('QcZbyMzYYtU', html)
+        self.assertEqual(parsed['title'], 'Titolo "test"')
+        self.assertEqual(parsed['duration'], 1666)
+        sb = parsed['storyboard']
+        self.assertEqual((sb['width'], sb['height'], sb['cols'], sb['rows'], sb['count'], sb['interval_ms']),
+                         (320, 180, 3, 3, 168, 10000))
+        self.assertEqual(sb['sheet_url_template'],
+                         'https://i.ytimg.com/sb/QcZbyMzYYtU/storyboard3_L1/M{M}.jpg?sqp=abc&rs=SIG3')
 
 
 class SearchTransportTests(unittest.TestCase):

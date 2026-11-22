@@ -22,7 +22,13 @@ from epg import Guide
 from health import Health
 from screen_share import ShareRelay
 from sharing_pages import render_share
-from text_input import extract_youtube_video_id, validate_query, validate_youtube_seek
+from text_input import (
+    extract_youtube_video_id,
+    fetch_youtube_storyboard,
+    validate_query,
+    validate_youtube_seek,
+    validate_youtube_video_id,
+)
 from ios_setup import load_profile, setup_page
 from native_video import NativeCast
 
@@ -98,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
         # Its receiver uses a static same-origin script, supported by CSP1 too.
         path = urlsplit(self.path).path
         if path in ('/', '/remote-panel'):
-            share_csp = "; frame-src https://www.youtube.com https://www.youtube-nocookie.com; img-src 'self' data: https://i.ytimg.com"
+            share_csp = "; img-src 'self' data: https://i.ytimg.com"
         script_policy = "'self'" if path in ('/share', '/screen') or path in SCRIPT_ASSETS else "'nonce-" + CSRF + "'"
         ancestors = "'self'" if remote_panel else "'none'"
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src " + script_policy + "; style-src 'unsafe-inline'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'" + share_csp)
@@ -284,6 +290,18 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 return self.reply(400, {'error': 'Cursore non valido'})
             return self.reply(200, timeline.read(after, query.get('epoch', [None])[0]))
+        if parsed.path == '/api/youtube/storyboard':
+            if self.headers.get('X-Remote-Key') != CSRF:
+                return self.reply(403, {'error': 'Richiesta non autorizzata'})
+            query = parse_qs(parsed.query)
+            try:
+                vid = validate_youtube_video_id(query.get('v', [''])[0])
+            except ValueError as exc:
+                return self.reply(400, {'error': str(exc)})
+            try:
+                return self.reply(200, fetch_youtube_storyboard(vid))
+            except Exception as exc:
+                return self.reply(502, {'error': type(exc).__name__})
         if self.path == '/api/status':
             screen_active = (sharing is not None and sharing.viewer is not None) or (
                 native_cast.session is not None and not native_cast.session.closed)
