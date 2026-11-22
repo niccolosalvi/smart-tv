@@ -7,13 +7,14 @@ import time
 import urllib.request
 import websocket
 import ipaddress
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from samsungtvws import SamsungTVWS
 from diagnostics import timeline, tv_event
-from text_input import youtube_search_payload, youtube_video_payload
+from text_input import extract_youtube_video_id, youtube_search_payload, youtube_video_payload
 
 logging.getLogger('samsungtvws').setLevel(logging.CRITICAL)
 logging.getLogger('websocket').setLevel(logging.CRITICAL)
@@ -61,6 +62,7 @@ class Remote:
         self._closing = set()
         self._status_cache = None
         self._status_time = 0.0
+        self._yt_confirmed_psid = None
         self.tv = (ObservedTV if trace_events else SamsungTVWS)(host=HOST, port=PORT, timeout=timeout,
             name=os.environ.get('TV_CLIENT_NAME', 'Smart TV Locale'),
             token_file=str(STATE / 'tv-token'), key_press_delay=0.35)
@@ -193,76 +195,189 @@ class Remote:
                 record('youtube:search', started, 'error', error_type=type(exc).__name__)
                 raise RuntimeError(type(exc).__name__) from None
 
-    def play_youtube_url(self, url, launch_delay=None):
-        body = youtube_video_payload(url)
-        with self.lock:
-            started = time.perf_counter()
+    def _read_youtube_dial(self, opener):
+        try:
+            with opener.open(f'http://{HOST}:8080/ws/apps/YouTube', timeout=2) as response:
+                raw = response.read()
+            xml = raw.decode('utf-8', 'replace') if isinstance(raw, (bytes, bytearray)) else str(raw)
+        except Exception:
+            return {'state': None, 'oisi': None, 'ts': None, 'psid': None, 'sid': None}
+        def tag(name):
+            match = re.search(rf'<{name}>([^<]*)</{name}>', xml)
+            return match.group(1) if match else None
+        return {
+            'state': tag('state'),
+            'oisi': tag('oisi'),
+            'ts': tag('oisiTimestamp'),
+            'psid': tag('passiveSessionId'),
+            'sid': tag('screenId'),
+        }
+
+    def _youtube_lounge_state(self, opener, screen_id):
+        if not screen_id or HOST in {'127.0.0.1', 'localhost'}:
+            return None
+        try:
+            data = urlencode({'screen_ids': screen_id}).encode('utf-8')
+            token_req = urllib.request.Request(
+                'https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch',
+                data=data, method='POST')
+            with opener.open(token_req, timeout=2.5) as response:
+                token_data = json.load(response)
+            screens = token_data.get('screens') or []
+            if not screens or not screens[0].get('loungeToken'):
+                return None
+            lounge_token = screens[0]['loungeToken']
+            params = urlencode({
+                'device': 'REMOTE_CONTROL',
+                'id': '12345678-9abc-4def-8123-456789abcdef',
+                'name': 'SmartTVLocale',
+                'app': 'youtube-desktop',
+                'mdx-version': '3',
+                'VER': '8',
+                'v': '2',
+                'RID': '1',
+                'CVER': '1',
+                'zx': str(int(time.time() * 1000)),
+                't': '1',
+            })
+            bind_req = urllib.request.Request(
+                f'https://www.youtube.com/api/lounge/bc/bind?{params}',
+                data=urlencode({'count': '0'}).encode('utf-8'),
+                headers={
+                    'X-YouTube-LoungeId-Token': lounge_token,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                method='POST')
+            with opener.open(bind_req, timeout=2.5) as response:
+                raw = response.read()
+            bind_text = raw.decode('utf-8', 'replace') if isinstance(raw, (bytes, bytearray)) else str(raw)
+            if '"loungeStatus"' not in bind_text:
+                return None
+            vid = re.search(r'"videoId"\s*:\s*"([^"]+)"', bind_text)
+            fvid = re.search(r'"firstVideoId"\s*:\s*"([^"]+)"', bind_text)
+            return {
+                'video_id': vid.group(1) if vid else None,
+                'first_video_id': fvid.group(1) if fvid else None,
+            }
+        except Exception:
+            return None
+
+    def _send_enter_reliable(self):
+        for attempt in range(2):
             try:
-                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-                app_url = f'http://{HOST}:8001/api/v2/applications/{APPS["youtube"]["id"]}'
-                was_running = False
-                was_visible = False
-                try:
-                    with opener.open(app_url, timeout=2) as response:
-                        pre = json.load(response)
-                        was_running = pre.get('running') is True
-                        was_visible = pre.get('visible') is True
-                except Exception:
-                    pass
-
-                # 1. Open / foreground YouTube via Samsung REST API.
-                launch_req = urllib.request.Request(app_url, data=b'', method='POST')
-                timeline.emit('Server → TV', 'REST POST apertura YouTube per riproduzione link')
-                with opener.open(launch_req, timeout=6) as response:
-                    launch_status = response.status
-                timeline.emit('TV', f'REST apertura YouTube: HTTP {launch_status}')
-
-                visible = was_visible
-                if not visible:
-                    for _ in range(5):
-                        if launch_delay is None:
-                            time.sleep(0.7)
-                        try:
-                            with opener.open(app_url, timeout=2) as response:
-                                state = json.load(response)
-                            if state.get('visible') is True:
-                                visible = True
-                                break
-                        except Exception:
-                            break
-
-                # 2. Wait for the profile picker ("Chi sta guardando?") and press OK (KEY_ENTER).
-                if launch_delay is not None:
-                    if launch_delay > 0:
-                        time.sleep(launch_delay)
-                else:
-                    time.sleep(1.0 if was_visible else (1.8 if was_running else 3.2))
-
                 if not self.tv.is_alive():
                     self.connect()
                 else:
                     timeline.emit('Server', 'Riutilizzo WebSocket esistente')
                 timeline.emit('Server → TV', 'WS Click KEY_ENTER · selezione profilo YouTube')
                 self.tv.send_key('KEY_ENTER')
+                return
+            except Exception:
+                self.close()
+                if attempt == 1:
+                    raise
 
-                if launch_delay is not None:
-                    if launch_delay > 0:
-                        time.sleep(launch_delay)
-                else:
-                    time.sleep(1.2)
+    def play_youtube_url(self, url, launch_delay=None):
+        video_id = extract_youtube_video_id(url)
+        body = youtube_video_payload(url)
+        with self.lock:
+            started = time.perf_counter()
+            try:
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                app_url = f'http://{HOST}:8001/api/v2/applications/{APPS["youtube"]["id"]}'
+                dial_url = f'http://{HOST}:8080/ws/apps/YouTube'
+                was_visible = False
+                try:
+                    with opener.open(app_url, timeout=2) as response:
+                        pre_rest = json.load(response)
+                        was_visible = pre_rest.get('visible') is True
+                except Exception:
+                    pass
 
-                # 3. Play the requested video directly via DIAL.
-                dial_req = urllib.request.Request(f'http://{HOST}:8080/ws/apps/YouTube',
-                    data=body, method='POST', headers={
-                        'Origin': 'https://www.youtube.com',
-                        'Content-Type': 'application/x-www-form-urlencoded'})
-                timeline.emit('Server → TV', 'DIAL avvio video YouTube · link escluso dai log')
-                with opener.open(dial_req, timeout=6) as response:
-                    http_status = response.status
+                pre_dial = self._read_youtube_dial(opener)
+                was_ui_ready = (
+                    was_visible
+                    and pre_dial['state'] == 'running'
+                    and bool(pre_dial['sid'])
+                    and bool(pre_dial['psid'])
+                )
+
+                def wait(seconds):
+                    if launch_delay is not None:
+                        if launch_delay > 0:
+                            time.sleep(launch_delay)
+                    elif seconds > 0:
+                        time.sleep(seconds)
+
+                cur_dial = pre_dial
+                visible = was_visible
+                if not was_ui_ready:
+                    if launch_delay is None and self.tv.connection is not None:
+                        self.close()
+                    if not was_visible:
+                        launch_req = urllib.request.Request(app_url, data=b'', method='POST')
+                        timeline.emit('Server → TV', 'REST POST apertura YouTube per riproduzione link')
+                        with opener.open(launch_req, timeout=6) as response:
+                            launch_status = response.status
+                        timeline.emit('TV', f'REST apertura YouTube: HTTP {launch_status}')
+                        visible = True
+                    max_polls = 1 if launch_delay is not None else 48
+                    for _ in range(max_polls):
+                        wait(0.5)
+                        d = self._read_youtube_dial(opener)
+                        cur_dial = d
+                        if d['state'] == 'running' and d['sid'] and d['psid']:
+                            if not pre_dial['sid'] or d['psid'] != pre_dial['psid']:
+                                timeline.emit('TV', 'Schermata selezione profilo YouTube caricata (passiveSessionId attivo)')
+                                wait(2.5)
+                                break
+
+                st_before = self._youtube_lounge_state(opener, cur_dial.get('sid'))
+                profile_open = (
+                    not was_ui_ready
+                    or cur_dial.get('psid') != self._yt_confirmed_psid
+                    or (st_before is not None and st_before['video_id'] is None)
+                )
+                if (was_ui_ready and cur_dial.get('psid') == self._yt_confirmed_psid
+                        and st_before is not None and st_before['video_id'] is not None):
+                    profile_open = False
+
+                ok_sent = 0
+                if profile_open:
+                    ok_sent += 1
+                    timeline.emit('Server', 'Pagina selezione profilo YouTube rilevata: invio OK automatico')
+                    self._send_enter_reliable()
+                    self._yt_confirmed_psid = cur_dial.get('psid')
+                    wait(2.5)
+
+                def send_dial():
+                    dial_req = urllib.request.Request(dial_url,
+                        data=body, method='POST', headers={
+                            'Origin': 'https://www.youtube.com',
+                            'Content-Type': 'application/x-www-form-urlencoded'})
+                    timeline.emit('Server → TV', 'DIAL avvio video YouTube · link escluso dai log')
+                    with opener.open(dial_req, timeout=6) as response:
+                        return response.status
+
+                http_status = send_dial()
+                wait(2.5)
+
+                st_after = self._youtube_lounge_state(opener, cur_dial.get('sid'))
+                if st_after is not None and st_after['video_id'] != video_id:
+                    ok_sent += 1
+                    timeline.emit('Server', 'Profilo YouTube ancora richiesto dopo DIAL: invio OK e riavvio video')
+                    self._send_enter_reliable()
+                    wait(2.2)
+                    http_status = send_dial()
+                    wait(2.2)
+                    self._yt_confirmed_psid = self._read_youtube_dial(opener).get('psid')
+
                 self.invalidate_status_cache()
                 return record('youtube:play', started, 'sent', transport='rest+ws+dial',
                               http_status=http_status, visible=visible,
-                              note='YouTube aperto, profilo confermato con OK e video avviato')
+                              profile_confirmed=ok_sent > 0,
+                              note='YouTube aperto, profilo confermato con OK e video avviato' if ok_sent > 0 else
+                                   'YouTube già nel profilo attivo e video avviato')
             except Exception as exc:
                 self.tv.close()
                 record('youtube:play', started, 'error', error_type=type(exc).__name__)

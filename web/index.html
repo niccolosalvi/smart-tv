@@ -634,14 +634,15 @@ async function command(payload){
  logLine('Browser → Server',description+' · invio HTTP',{request_id:id});
  const start=performance.now();
  try{
-  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':controlKey,'X-Request-ID':id},body:JSON.stringify(payload),signal:AbortSignal.timeout(25000)});
+  const timeoutMs=Object.hasOwn(payload,'youtube_url')?45000:25000;
+  const response=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Key':controlKey,'X-Request-ID':id},body:JSON.stringify(payload),signal:AbortSignal.timeout(timeoutMs)});
   const data=await response.json();
   const roundtrip=Math.round(performance.now()-start);
   await readLogs();
   logLine('Browser','Ricevuto HTTP '+response.status+' · totale '+roundtrip+' ms · server '+(data.server_elapsed_ms??'?')+' ms',{request_id:id,level:response.ok?'info':'error'});
   renderContext(data.context);
   if(!response.ok)throw Error(data.error+(data.hint?' · '+data.hint:''));
-  if(Object.hasOwn(payload,'youtube_url')){status.textContent='YouTube aperto, profilo confermato con OK e video avviato sulla TV.'}
+  if(Object.hasOwn(payload,'youtube_url')){status.textContent=data.profile_confirmed===false?'YouTube già nel profilo attivo: video avviato direttamente sulla TV.':'YouTube aperto, schermata profilo rilevata (OK inviato) e video avviato sulla TV.'}
   else if(Object.hasOwn(payload,'youtube_search')){status.textContent=data.status==='demo'?'Demo: nessuna ricerca inviata alla TV.':'Ricerca inviata a YouTube sulla TV. Usa le frecce per scegliere un video.'}
   else if(payload.context){status.textContent='Vista aggiornata. Nessun comando inviato alla TV.'}
   else if(payload.screen){status.textContent='Apertura del ricevitore richiesta sulla TV. Caricamento pagina non confermato.'}

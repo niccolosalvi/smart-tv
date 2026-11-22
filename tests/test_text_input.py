@@ -107,6 +107,7 @@ class SearchTransportTests(unittest.TestCase):
         result = self.remote.play_youtube_url(url, launch_delay=0)
         self.assertEqual((result['status'], result['transport'], result['http_status']),
                          ('sent', 'rest+ws+dial', 201))
+        self.assertTrue(result['profile_confirmed'])
         calls = [c.args[0] for c in self.opener.open.call_args_list if hasattr(c.args[0], 'full_url')]
         post_calls = [req for req in calls if req.get_method() == 'POST']
         self.assertEqual(len(post_calls), 2)
@@ -117,6 +118,38 @@ class SearchTransportTests(unittest.TestCase):
         self.remote.tv.send_key.assert_called_once_with('KEY_ENTER')
         self.assertNotIn('dQw4w9WgXcQ', json.dumps(self.log.read()) + str(self.record.call_args_list))
         self.assertNotIn('secretToken', json.dumps(self.log.read()) + str(self.record.call_args_list))
+
+    def test_play_youtube_url_skips_ok_when_profile_already_active_and_playing(self):
+        self.remote.tv.is_alive.return_value = True
+        self.remote._yt_confirmed_psid = 'psid-active-1'
+        self.remote._read_youtube_dial = Mock(return_value={
+            'state': 'running', 'oisi': 'null', 'ts': '123',
+            'psid': 'psid-active-1', 'sid': 'screen-1',
+        })
+        self.remote._youtube_lounge_state = Mock(side_effect=[
+            {'video_id': 'prevVideo11', 'first_video_id': 'prevVideo11'},
+            {'video_id': 'dQw4w9WgXcQ', 'first_video_id': 'prevVideo11'},
+        ])
+        with patch('remote.json.load', return_value={'running': True, 'visible': True}):
+            result = self.remote.play_youtube_url('https://youtu.be/dQw4w9WgXcQ', launch_delay=0)
+        self.assertFalse(result['profile_confirmed'])
+        self.remote.tv.send_key.assert_not_called()
+
+    def test_play_youtube_url_detects_profile_screen_after_dial_and_confirms_with_ok(self):
+        self.remote.tv.is_alive.return_value = True
+        self.remote._yt_confirmed_psid = 'psid-active-1'
+        self.remote._read_youtube_dial = Mock(return_value={
+            'state': 'running', 'oisi': 'null', 'ts': '123',
+            'psid': 'psid-active-1', 'sid': 'screen-1',
+        })
+        self.remote._youtube_lounge_state = Mock(side_effect=[
+            {'video_id': 'prevVideo11', 'first_video_id': 'prevVideo11'},
+            {'video_id': None, 'first_video_id': 'dQw4w9WgXcQ'},
+        ])
+        with patch('remote.json.load', return_value={'running': True, 'visible': True}):
+            result = self.remote.play_youtube_url('https://youtu.be/dQw4w9WgXcQ', launch_delay=0)
+        self.assertTrue(result['profile_confirmed'])
+        self.remote.tv.send_key.assert_called_once_with('KEY_ENTER')
 
 
 if __name__ == '__main__':

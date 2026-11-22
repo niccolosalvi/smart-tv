@@ -58,7 +58,7 @@ class Handler(BaseHTTPRequestHandler):
     def setup(self):
         super().setup()
         try:
-            self.connection.settimeout(30)
+            self.connection.settimeout(45)
             self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except OSError:
             pass
